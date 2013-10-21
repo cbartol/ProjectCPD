@@ -6,13 +6,13 @@ enum MOVE {
 	BOTTOM = 3,
 	LEFT = 4,
 	NONE = 5
-}
+};
 
-struct world {
-	int type; /* Wolf, Squirrel, etc. */
+typedef struct {
+	int type;
 	int breeding_period;
 	int starvation_period;
-} world[MAX][MAX];
+} world;
 
 typedef struct {
 	int row;
@@ -22,6 +22,7 @@ typedef struct {
 int BREEDING_LEVEL;
 int STARVING_LEVEL;
 int WORLD_SIZE;
+world WORLD[MAX][MAX];
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(position pos);
