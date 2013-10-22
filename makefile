@@ -7,7 +7,7 @@ create:
 	mkdir -p $(BIN)
 	
 serial:
-	gcc -ansi -pedantic -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c
+	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c
 
 omp:
 	gcc -ansi -pedantic -Wall -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp
