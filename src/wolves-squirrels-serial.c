@@ -71,7 +71,7 @@ int numberOfPosition(position pos) {
 int canMoveTo(position currentPos, position possiblePos){
 	
 	int currentCell = old_world[currentPos.row][currentPos.column].type;
-	int possibleCell = new_world[possiblePos.row][possiblePos.column].type;
+	int possibleCell = old_world[possiblePos.row][possiblePos.column].type;
 	
 	if(currentCell != ICE || currentCell != TREE){
 		if(possibleCell != ICE)
