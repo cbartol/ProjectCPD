@@ -123,49 +123,81 @@ position getDestination(position pos) {
 }
 
 /* leaves a child in the current position */
-void breed(position currentPos){}
+void breed(position currentPos, position destinationPos){
+    
+    int currentCell = old_world[currentPos.row][currentPos.column].type;
+    new_world[currentPos.row][currentPos.column].type = currentCell;
+    
+    if(currentCell == WOLF){
+        new_world[currentPos.row][currentPos.column].breeding_period = WOLF_BREEDING_LEVEL;
+        new_world[currentPos.row][currentPos.column].breeding_period = WOLF_STARVING_LEVEL;
+        new_world[destinationPos.row][destinationPos.column].breeding_period = WOLF_BREEDING_LEVEL;
+    }
+    else {
+        new_world[currentPos.row][currentPos.column].breeding_period = SQUIRREL_BREEDING_LEVEL;
+        new_world[destinationPos.row][destinationPos.column].breeding_period = SQUIRREL_BREEDING_LEVEL;
+    }
+}
 
 /* kills the wolf and cell becomes empty*/
-void die(position pos){}
+void die(position pos){
+    
+    new_world[pos.row][pos.column].type = EMPTY;
+    new_world[pos.row][pos.column].starvation_period = 0;
+    new_world[pos.row][pos.column].breeding_period = 0;
+}
 
 /* Nao sei se isto e' util mas pode vir a ser xD */
-void solvePossibleConflits(position pos){}
+void solvePossibleConflits(position currentPos, position destinationPos){
+    
+    int currentCellType = old_world[currentPos.row][currentPos.column].type;
+    int currentCellBPeriod = old_world[currentPos.row][currentPos.column].breeding_period;
+    int currentCellSPeriod = old_world[currentPos.row][currentPos.column].starvation_period;
+    //testar condicoes possiveis de conflito
+    
+    //destino passa a igual a' actual
+    new_world[destinationPos.row][destinationPos.column].type = currentCellType;
+    new_world[destinationPos.row][destinationPos.column].breeding_period = currentCellBPeriod;
+    new_world[destinationPos.row][destinationPos.column].starvation_period = currentCellSPeriod - 1;
+}
 
 /* wolf eats squirrel in the destination position and sets its starvation period */
-void eatSquirrel(position destinationPosition){}
+void eatSquirrel(position destinationPos){
+    new_world[destinationPos.row][destinationPos.column].starvation_period= WOLF_STARVING_LEVEL;
+}
 
 /* moves animal from the current position to its destination */
-void moveTo(position currentPos, position destinationPos){}
+void moveTo(position currentPos, position destinationPos){
+        
+    solvePossibleConflits(currentPos,destinationPos);
+        
+    //actual passa a empty
+    new_world[currentPos.row][currentPos.column].type = EMPTY;
+    new_world[currentPos.row][currentPos.column].breeding_period = 0;
+    new_world[currentPos.row][currentPos.column].starvation_period = 0;
+}
 
 // why returns something?? Ja' nao :-P
 void updateCell(position pos) {
-    
-	position destinationPosition = getDestination(pos); // posicao para onde se vai mover
-	int currentCell,destinationCell, moved=0;
+        
+    position destinationPosition = getDestination(pos); // posicao para onde se vai mover
+    int currentCell;
     
     // se posicao retornada igual a' actual bubai
-	if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
-		return;
-	else {
+    if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
+        return;
+    else {
         currentCell = old_world[pos.row][pos.column].type;
-        destinationCell = old_world[destinationPosition.row][destinationPosition.column].type;
-        //destination cell
         if(currentCell == WOLF){
             if(isStarving(pos)){
                 die(pos);
                 return;
             }
-            if(destinationCell == SQUIRREL){ //pode simultaneamente ter bebe´ por isso convem ter a flag para saber se ja se moveu ou nao
-                moveTo(pos,destinationPosition);
-                moved=1;
-                eatSquirrel(destinationPosition);
-            }
         }
-        if(isBreeding(pos)){
-            if(! moved)
-                moveTo(pos,destinationPosition);
-                breed(pos);
-        }
+        if(isBreeding(pos))
+            breed(pos,destinationPosition);
+        moveTo(pos,destinationPosition);
+        
     }
 }
 
