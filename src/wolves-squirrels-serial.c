@@ -137,9 +137,50 @@ int updateCell(position pos) {
 	return 0;
 }
 
-void createWorld(world aWorld, FILE *input) {}
-void playReds() {}
-void playBlacks() {}
+enum type convertType(char type) {
+	switch (type) {
+	case 'w': return WOLF;
+	case 's': return SQUIRREL;
+	case 'i': return ICE;
+	case 't': return TREE;
+	case '$': return SQUIRREL_ON_TREE;
+	}
+
+	fprintf(stderr, "Unknown type: %c\n", type);
+	exit(EXIT_FAILURE);
+}
+
+void createWorld(world aWorld, FILE *input) {
+	// initialize world with zeros
+	memset(aWorld, 0, sizeof(world));
+
+	// read world size
+	fscanf(input, "%d", &WORLD_SIZE);
+
+	int row;
+	int column;
+	char type;
+	while (fscanf(input, "%d %d %c", &row, &column, &type)) {
+		old_world[row-1][column-1].type = convertType(type);
+	}
+}
+
+// blackTurn is 0 for red and 1 for blacks
+void play(int blackTurn) {
+	int i, j;
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (!blackTurn && (i >> 1 == j >> 1)) {
+				// red turn
+				;
+			}
+			else if (blackTurn && (i >> 1 != j >> 1)) {
+				// black turn
+				;
+			}
+		}
+	}
+}
 
 /*
 	arg[1] = filename
@@ -171,8 +212,10 @@ int main(int argc, char **argv) {
 
 	int gen;
 	for (gen = 0; gen < number_generations; gen++) {
-		playReds();
-		playBlacks();
+		play(0);
+		memcpy(new_world, old_world, sizeof(world));
+		play(1);
+		memcpy(new_world, old_world, sizeof(world));
 	}
 
 	return 0;

@@ -16,7 +16,7 @@ mpi:
 	gcc -ansi -pedantic -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c
 
 clean:
-	rm -r $(BIN) 2> /dev/null
+	rm -rf $(BIN) 2> /dev/null
 
 tests:
 	test-gen.sh
