@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MAX 100
@@ -31,21 +32,35 @@ typedef struct {
 	int column;
 } position;
 
-int NUM_ARGUMENTS = 5;
-int BREEDING_LEVEL;
-int STARVING_LEVEL;
+int NUM_ARGUMENTS = 6;
+int WOLF_BREEDING_LEVEL;
+int SQUIRREL_BREEDING_LEVEL;
+int WOLF_STARVING_LEVEL;
 int WORLD_SIZE;
-struct world old_world;
-struct world new_world;
+world old_world;
+world new_world;
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(position pos) {
-	return wold[pos.row][pos.column].breeding_period == BREEDING_LEVEL;
+	if (old_world[pos.row][pos.column].type == WOLF) {
+		return old_world[pos.row][pos.column].breeding_period == WOLF_BREEDING_LEVEL;
+	}
+	else if (old_world[pos.row][pos.column].type == SQUIRREL) {
+		return old_world[pos.row][pos.column].breeding_period == SQUIRREL_BREEDING_LEVEL;
+	}
+	else {
+		return 0;
+	}
 }
 
 /* returns 1 if animal is starving, 0 otherwise */
 int isStarving(position pos) {
-	return wold[pos.row][pos.column].starvation_period == STARVING_LEVEL;
+	if (old_world[pos.row][pos.column].type == WOLF) {
+		return old_world[pos.row][pos.column].starvation_period == WOLF_STARVING_LEVEL;
+	}
+	else {
+		return 0;
+	}
 }
 
 int numberOfPosition(position pos) {
@@ -55,8 +70,8 @@ int numberOfPosition(position pos) {
 /* returns 1 if can move to theb given position*/
 int canMoveTo(position currentPos, position possiblePos){
 	
-	int currentCell = WORLD[currentPos.row][currentPos.column].type;
-	int possibleCell = WORLD[possiblePos.row][possiblePos.column].type;
+	int currentCell = old_world[currentPos.row][currentPos.column].type;
+	int possibleCell = new_world[possiblePos.row][possiblePos.column].type;
 	
 	if(currentCell != ICE || currentCell != TREE){
 		if(possibleCell != ICE)
@@ -107,37 +122,58 @@ position getDestination(position pos) {
 	return pos;
 }
 
+// why returns something??
 int updateCell(position pos) {
 	position destinationPosition = getDestination(pos); // posicao para onde se vai mover
 	
 	if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
+		;
 	// se posicao retornada igual a' actual bubai
 	
 	// se nao vai alterar world aux na posicao destination 
 	// inc breeding period e testar se e' igual a BREEDING_LEVEL
-	// se sim deixar baby pa trás se nao empty  e reset a breeding period do esquilo que vai pa destination	
+	// se sim deixar baby pa trás se nao empty  e reset a breeding period do esquilo que vai pa destination
+
+	return 0;
 }
 
-void createWorld(world aWorld, FILE *input);
-void playReds();
-void playBlacks();
+void createWorld(world aWorld, FILE *input) {}
+void playReds() {}
+void playBlacks() {}
 
+/*
+	arg[1] = filename
+	arg[2] = wolf_breeding_period
+	arg[3] = squirtle_breeding_period
+	arg[4] = wolf_starvation_period
+	arg[5] = # generations
+*/
 int main(int argc, char **argv) {
 	if (argc < NUM_ARGUMENTS) {
 		fprintf(stderr, "Not enough arguments...");
 		exit(EXIT_FAILURE);
 	}
 
+	// read file
 	FILE *input = fopen(argv[1], "r");
-	if (input == null) {
+	if (input == NULL) {
 		fprintf(stderr, "File %s not found...", argv[1]);
 		exit(EXIT_FAILURE);
 	}
 	createWorld(old_world, input);
-	memset(new_world, old_world, sizeof(world));
+	memcpy(new_world, old_world, sizeof(world));
 	fclose(input);
 
-	playReds();
-	playBlacks();
+	WOLF_BREEDING_LEVEL = atoi(argv[2]);
+	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
+	WOLF_STARVING_LEVEL = atoi(argv[4]);
+	int number_generations = atoi(argv[5]);
+
+	int gen;
+	for (gen = 0; gen < number_generations; gen++) {
+		playReds();
+		playBlacks();
+	}
+
 	return 0;
 }
