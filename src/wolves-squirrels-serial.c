@@ -13,12 +13,12 @@ enum move {
 };
 
 enum type {
+	EMPTY = 0,
 	WOLF = 1,
 	SQUIRREL = 2,
 	TREE = 3,
 	ICE = 4,
-	SQUIRREL_ON_TREE = 5,
-	EMPTY = 6
+	SQUIRREL_ON_TREE = 5
 };
 
 typedef struct {
