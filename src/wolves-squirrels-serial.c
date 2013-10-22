@@ -122,19 +122,51 @@ position getDestination(position pos) {
 	return pos;
 }
 
-// why returns something??
-int updateCell(position pos) {
-	position destinationPosition = getDestination(pos); // posicao para onde se vai mover
-	
-	if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
-		;
-	// se posicao retornada igual a' actual bubai
-	
-	// se nao vai alterar world aux na posicao destination 
-	// inc breeding period e testar se e' igual a BREEDING_LEVEL
-	// se sim deixar baby pa trás se nao empty  e reset a breeding period do esquilo que vai pa destination
+/* leaves a child in the current position */
+void breed(position currentPos){}
 
-	return 0;
+/* kills the wolf and cell becomes empty*/
+void die(position pos){}
+
+/* Nao sei se isto e' util mas pode vir a ser xD */
+void solvePossibleConflits(position pos){}
+
+/* wolf eats squirrel in the destination position and sets its starvation period */
+void eatSquirrel(position destinationPosition){}
+
+/* moves animal from the current position to its destination */
+void moveTo(position currentPos, position destinationPos){}
+
+// why returns something?? Ja' nao :-P
+void updateCell(position pos) {
+    
+	position destinationPosition = getDestination(pos); // posicao para onde se vai mover
+	int currentCell,destinationCell, moved=0;
+    
+    // se posicao retornada igual a' actual bubai
+	if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
+		return;
+	else {
+        currentCell = old_world[pos.row][pos.column].type;
+        destinationCell = old_world[destinationPosition.row][destinationPosition.column].type;
+        //destination cell
+        if(currentCell == WOLF){
+            if(isStarving(pos)){
+                die(pos);
+                return;
+            }
+            if(destinationCell == SQUIRREL){ //pode simultaneamente ter bebe´ por isso convem ter a flag para saber se ja se moveu ou nao
+                moveTo(pos,destinationPosition);
+                moved=1;
+                eatSquirrel(destinationPosition);
+            }
+        }
+        if(isBreeding(pos)){
+            if(! moved)
+                moveTo(pos,destinationPosition);
+                breed(pos);
+        }
+    }
 }
 
 enum type convertType(char type) {
