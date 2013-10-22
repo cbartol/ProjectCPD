@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <string.h>
+
 #define MAX 100
 
 enum move {
@@ -8,27 +11,33 @@ enum move {
 	NONE = 4
 };
 
-typedef struct {
+typedef struct world {
 	int type;
 	int breeding_period;
 	int starvation_period;
-} world;
+} world[MAX][MAX];
 
 typedef struct {
 	int row;
 	int column;
 } position;
 
+int NUM_ARGUMENTS = 5;
 int BREEDING_LEVEL;
 int STARVING_LEVEL;
 int WORLD_SIZE;
-world WORLD[MAX][MAX];
+struct world old_world;
+struct world new_world;
 
 /* returns 1 if animal is breeding, 0 otherwise */
-int isBreeding(position pos);
+int isBreeding(position pos) {
+	return wold[pos.row][pos.column].breeding_period == BREEDING_LEVEL;
+}
 
 /* returns 1 if animal is starving, 0 otherwise */
-int isStarving(position pos);
+int isStarving(position pos) {
+	return wold[pos.row][pos.column].starvation_period == STARVING_LEVEL;
+}
 
 int numberOfPosition(position pos) {
 	return pos.row * WORLD_SIZE + pow.column;
@@ -70,9 +79,28 @@ int getDestination(position pos) {
 		}
 	}
 }
+
 int updateCell(position pos);
-int createWorld(char **input);
+void createWorld(world aWorld, FILE *input);
+void playReds();
+void playBlacks();
 
 int main(int argc, char **argv) {
+	if (argc < NUM_ARGUMENTS) {
+		fprintf(stderr, "Not enough arguments...");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE *input = fopen(argv[1], "r");
+	if (input == null) {
+		fprintf(stderr, "File %s not found...", argv[1]);
+		exit(EXIT_FAILURE);
+	}
+	createWorld(old_world, input);
+	memset(new_world, old_world, sizeof(world));
+	fclose(input);
+
+	playReds();
+	playBlacks();
 	return 0;
 }
