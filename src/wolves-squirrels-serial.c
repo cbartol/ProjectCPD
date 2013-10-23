@@ -3,6 +3,8 @@
 #include <string.h>
 
 #define MAX 100
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b))
 
 enum move {
 	TOP = 0,
@@ -42,45 +44,40 @@ world new_world;
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(position pos) {
-	if (old_world[pos.row][pos.column].type == WOLF) {
-		return old_world[pos.row][pos.column].breeding_period == WOLF_BREEDING_LEVEL;
+	if (new_world[pos.row][pos.column].type == WOLF) {
+		return new_world[pos.row][pos.column].breeding_period == WOLF_BREEDING_LEVEL;
 	}
-	else if (old_world[pos.row][pos.column].type == SQUIRREL) {
-		return old_world[pos.row][pos.column].breeding_period == SQUIRREL_BREEDING_LEVEL;
+	else if (new_world[pos.row][pos.column].type == SQUIRREL) {
+		return new_world[pos.row][pos.column].breeding_period == SQUIRREL_BREEDING_LEVEL;
 	}
-	else {
-		return 0;
-	}
+	return 0;
 }
 
-/* returns 1 if animal is starving, 0 otherwise */
+/* returns 1 if wolf is starving, 0 otherwise */
 int isStarving(position pos) {
-	if (old_world[pos.row][pos.column].type == WOLF) {
-		return old_world[pos.row][pos.column].starvation_period == WOLF_STARVING_LEVEL;
-	}
-	else {
-		return 0;
-	}
+	return new_world[pos.row][pos.column].type == WOLF ? 
+		new_world[pos.row][pos.column].starvation_period == WOLF_STARVING_LEVEL :
+		0;
 }
 
+/* transforms a position into the corresponding number in the matrix */
 int numberOfPosition(position pos) {
 	return pos.row * WORLD_SIZE + pos.column;
 }
 
-/* returns 1 if can move to theb given position*/
-int canMoveTo(position currentPos, position possiblePos){
+/* returns 1 if type can move to the given position, 0 otherwise */
+int canMoveTo(position from, position to){
+	int fromCell = old_world[from.row][from.column].type;
+	int toCell = old_world[to.row][to.column].type;
 	
-	int currentCell = old_world[currentPos.row][currentPos.column].type;
-	int possibleCell = old_world[possiblePos.row][possiblePos.column].type;
-	
-	if(currentCell != ICE || currentCell != TREE){
-		if(possibleCell != ICE)
-			if(currentCell == WOLF ) 
-				if(possibleCell != TREE || possibleCell != SQUIRREL_ON_TREE)
-					return 1;
+	// can't move a tree or ice cell nor it can move to a ice cell
+	if ((fromCell == SQUIRREL || fromCell == WOLF) && (toCell != ICE)) {
+		// wolf's can't go to trees
+		if ((fromCell == WOLF) && (toCell == TREE || toCell == SQUIRREL_ON_TREE)) { 
+			return 0;
+		}
+		return 1;
 	}
-	else return 0;
-	
 	return 0;
 }
 
@@ -115,90 +112,94 @@ position getDestination(position pos) {
 			if (selected == 0) {
 				return possible[i];
 			}
-
 			selected--;
 		}
 	}
 	return pos;
 }
 
-/* leaves a child in the current position */
-void breed(position currentPos, position destinationPos){
-    
-    int currentCell = old_world[currentPos.row][currentPos.column].type;
-    new_world[currentPos.row][currentPos.column].type = currentCell;
-    
-    if(currentCell == WOLF){
-        new_world[currentPos.row][currentPos.column].breeding_period = WOLF_BREEDING_LEVEL;
-        new_world[currentPos.row][currentPos.column].breeding_period = WOLF_STARVING_LEVEL;
-        new_world[destinationPos.row][destinationPos.column].breeding_period = WOLF_BREEDING_LEVEL;
+/* leaves a child in the previous position */
+void breed(position prev, position cur) {
+    enum type type = new_world[cur.row][cur.column].type;
+    if (type == SQUIRREL_ON_TREE || type == SQUIRREL) {
+    	new_world[prev.row][prev.column].type = SQUIRREL;
     }
     else {
-        new_world[currentPos.row][currentPos.column].breeding_period = SQUIRREL_BREEDING_LEVEL;
-        new_world[destinationPos.row][destinationPos.column].breeding_period = SQUIRREL_BREEDING_LEVEL;
+   	    new_world[prev.row][prev.column].type = WOLF;
     }
+    new_world[prev.row][prev.column].starvation_period = 0;
+    new_world[prev.row][prev.column].breeding_period = 0;
 }
 
-/* kills the wolf and cell becomes empty*/
-void die(position pos){
-    
-    new_world[pos.row][pos.column].type = EMPTY;
+/* the cell becomes empty */
+void clean(position pos) {
+    enum type type = new_world[pos.row][pos.column].type;
+    if (type == WOLF || type == SQUIRREL) {
+    	new_world[pos.row][pos.column].type = EMPTY;
+    }
+    else if (type == SQUIRREL_ON_TREE) {
+    	new_world[pos.row][pos.column].type = TREE;
+    }
+
     new_world[pos.row][pos.column].starvation_period = 0;
     new_world[pos.row][pos.column].breeding_period = 0;
 }
 
-/* Nao sei se isto e' util mas pode vir a ser xD */
-void solvePossibleConflits(position currentPos, position destinationPos){
-    
-    int currentCellType = old_world[currentPos.row][currentPos.column].type;
-    int currentCellBPeriod = old_world[currentPos.row][currentPos.column].breeding_period;
-    int currentCellSPeriod = old_world[currentPos.row][currentPos.column].starvation_period;
-    //testar condicoes possiveis de conflito
-    
-    //destino passa a igual a' actual
-    new_world[destinationPos.row][destinationPos.column].type = currentCellType;
-    new_world[destinationPos.row][destinationPos.column].breeding_period = currentCellBPeriod;
-    new_world[destinationPos.row][destinationPos.column].starvation_period = currentCellSPeriod - 1;
-}
-
-/* wolf eats squirrel in the destination position and sets its starvation period */
-void eatSquirrel(position destinationPos){
-    new_world[destinationPos.row][destinationPos.column].starvation_period= WOLF_STARVING_LEVEL;
-}
-
 /* moves animal from the current position to its destination */
-void moveTo(position currentPos, position destinationPos){
-        
-    solvePossibleConflits(currentPos,destinationPos);
-        
-    //actual passa a empty
-    new_world[currentPos.row][currentPos.column].type = EMPTY;
-    new_world[currentPos.row][currentPos.column].breeding_period = 0;
-    new_world[currentPos.row][currentPos.column].starvation_period = 0;
+/* 	Duvida: aumenta-se o breeding period antes de mudar a posição ou depois?
+	O problema verifica-se se o lobo como o esquilo antes ou depois de aumentar?
+	Outro problema é se o lobo como o esquilo antes ou depois de ter o filho?
+
+	Actualmente aumenta o breeding period depois
+ 	e só tem o filho se continuar vivo depois de andar */
+void moveTo(position from, position to) { 
+	enum type from_type = old_world[from.row][from.column].type;  
+    enum type to_type = new_world[to.row][to.column].type;
+
+    // only animals are moved
+    if (from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) {
+    	if (to_type == WOLF) {
+    		new_world[to.row][to.column].starvation_period = 
+  					max(0, old_world[from.row][from.column].starvation_period - 1);
+    	}
+    	else {
+    		if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) {
+    			new_world[to.row][to.column].breeding_period = 
+    					max(old_world[from.row][from.column].breeding_period + 1,
+    						new_world[to.row][to.column].breeding_period);
+    		}
+    		else {
+    			new_world[to.row][to.column].breeding_period = 
+    					old_world[from.row][from.column].breeding_period + 1;
+    		}
+    	}
+    }
+    else {
+    	if (to_type == SQUIRREL) {
+    		new_world[to.row][to.column].type = WOLF;
+    		new_world[to.row][to.column].starvation_period = 
+  					max(0, old_world[from.row][from.column].starvation_period - 1);
+    		new_world[to.row][to.column].breeding_period = old_world[to.row][to.column].breeding_period + 1;
+    	}
+    	else if (to_type == WOLF) {
+    		new_world[to.row][to.column].starvation_period = 
+    				min(old_world[from.row][from.column].starvation_period,
+    				    new_world[to.row][to.column].starvation_period);
+    	}
+    }
+    clean(from);
 }
 
-// why returns something?? Ja' nao :-P
 void updateCell(position pos) {
-        
-    position destinationPosition = getDestination(pos); // posicao para onde se vai mover
-    int currentCell;
-    
-    // se posicao retornada igual a' actual bubai
-    if((pos.row == destinationPosition.row) && (pos.column == destinationPosition.column))
-        return;
-    else {
-        currentCell = old_world[pos.row][pos.column].type;
-        if(currentCell == WOLF){
-            if(isStarving(pos)){
-                die(pos);
-                return;
-            }
-        }
-        if(isBreeding(pos))
-            breed(pos,destinationPosition);
-        moveTo(pos,destinationPosition);
-        
+    enum type type = old_world[pos.row][pos.column].type;
+    if (type == ICE || type == TREE || type == NONE) {
+    	return;
     }
+
+    position to = getDestination(pos);
+    moveTo(pos,to);
+    if (isStarving(to)) clean(pos);
+    if (isBreeding(to)) breed(pos,to);
 }
 
 enum type convertType(char type) {
@@ -232,15 +233,13 @@ void createWorld(world aWorld, FILE *input) {
 // blackTurn is 0 for red and 1 for blacks
 void play(int blackTurn) {
 	int i, j;
+	position pos;
 	for (i = 0; i < WORLD_SIZE; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
-			if (!blackTurn && (i >> 1 == j >> 1)) {
-				// red turn
-				;
-			}
-			else if (blackTurn && (i >> 1 != j >> 1)) {
-				// black turn
-				;
+			pos.row = i;
+			pos.column = j;
+			if ((!blackTurn && (i >> 1 == j >> 1)) || (blackTurn && (i >> 1 != j >> 1))) {
+				updateCell(pos);
 			}
 		}
 	}
