@@ -6,7 +6,7 @@
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
-enum move {
+enum Move {
 	TOP = 0,
 	RIGHT = 1,
 	BOTTOM = 2,
@@ -14,7 +14,7 @@ enum move {
 	NONE = 4
 };
 
-enum type {
+enum Type {
 	EMPTY = 0,
 	WOLF = 1,
 	SQUIRREL = 2,
@@ -24,26 +24,26 @@ enum type {
 };
 
 typedef struct {
-	enum type type;
+	enum Type type;
 	int breeding_period;
 	int starvation_period;
-} world[MAX][MAX];
+} World[MAX][MAX];
 
 typedef struct {
 	int row;
 	int column;
-} position;
+} Position;
 
 int NUM_ARGUMENTS = 6;
 int WOLF_BREEDING_LEVEL;
 int SQUIRREL_BREEDING_LEVEL;
 int WOLF_STARVING_LEVEL;
 int WORLD_SIZE;
-world old_world;
-world new_world;
+World old_world;
+World new_world;
 
 /* returns 1 if animal is breeding, 0 otherwise */
-int isBreeding(position pos) {
+int isBreeding(Position pos) {
 	if (new_world[pos.row][pos.column].type == WOLF) {
 		return new_world[pos.row][pos.column].breeding_period == WOLF_BREEDING_LEVEL;
 	}
@@ -54,19 +54,19 @@ int isBreeding(position pos) {
 }
 
 /* returns 1 if wolf is starving, 0 otherwise */
-int isStarving(position pos) {
+int isStarving(Position pos) {
 	return new_world[pos.row][pos.column].type == WOLF ? 
 		new_world[pos.row][pos.column].starvation_period == WOLF_STARVING_LEVEL :
 		0;
 }
 
-/* transforms a position into the corresponding number in the matrix */
-int numberOfPosition(position pos) {
+/* transforms a Position into the corresponding number in the matrix */
+int numberOfPosition(Position pos) {
 	return pos.row * WORLD_SIZE + pos.column;
 }
 
-/* returns 1 if type can move to the given position, 0 otherwise */
-int canMoveTo(position from, position to){
+/* returns 1 if type can move to the given Position, 0 otherwise */
+int canMoveTo(Position from, Position to){
 	int fromCell = old_world[from.row][from.column].type;
 	int toCell = old_world[to.row][to.column].type;
 	
@@ -82,8 +82,8 @@ int canMoveTo(position from, position to){
 }
 
 /* returns a valid move */
-position getDestination(position pos) {
-	position possible[4];
+Position getDestination(Position pos) {
+	Position possible[4];
 	int available[4];
 
 	possible[TOP].row = pos.row - 1;
@@ -118,9 +118,9 @@ position getDestination(position pos) {
 	return pos;
 }
 
-/* leaves a child in the previous position */
-void breed(position prev, position cur) {
-    enum type type = new_world[cur.row][cur.column].type;
+/* leaves a child in the previous Position */
+void breed(Position prev, Position cur) {
+    enum Type type = new_world[cur.row][cur.column].type;
     if (type == SQUIRREL_ON_TREE || type == SQUIRREL) {
     	new_world[prev.row][prev.column].type = SQUIRREL;
     }
@@ -132,8 +132,8 @@ void breed(position prev, position cur) {
 }
 
 /* the cell becomes empty */
-void clean(position pos) {
-    enum type type = new_world[pos.row][pos.column].type;
+void clean(Position pos) {
+    enum Type type = new_world[pos.row][pos.column].type;
     if (type == WOLF || type == SQUIRREL) {
     	new_world[pos.row][pos.column].type = EMPTY;
     }
@@ -145,16 +145,16 @@ void clean(position pos) {
     new_world[pos.row][pos.column].breeding_period = 0;
 }
 
-/* moves animal from the current position to its destination */
+/* moves animal from the current Position to its destination */
 /* 	Duvida: aumenta-se o breeding period antes de mudar a posição ou depois?
 	O problema verifica-se se o lobo como o esquilo antes ou depois de aumentar?
 	Outro problema é se o lobo como o esquilo antes ou depois de ter o filho?
 
 	Actualmente aumenta o breeding period depois
  	e só tem o filho se continuar vivo depois de andar */
-void moveTo(position from, position to) { 
-	enum type from_type = old_world[from.row][from.column].type;  
-    enum type to_type = new_world[to.row][to.column].type;
+void moveTo(Position from, Position to) { 
+	enum Type from_type = old_world[from.row][from.column].type;  
+    enum Type to_type = new_world[to.row][to.column].type;
 
     // only animals are moved
     if (from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) {
@@ -190,19 +190,19 @@ void moveTo(position from, position to) {
     clean(from);
 }
 
-void updateCell(position pos) {
-    enum type type = old_world[pos.row][pos.column].type;
-    if (type == ICE || type == TREE || type == NONE) {
+void updateCell(Position pos) {
+    enum Type type = old_world[pos.row][pos.column].type;
+    if (type == ICE || type == TREE || type == EMPTY) {
     	return;
     }
 
-    position to = getDestination(pos);
+    Position to = getDestination(pos);
     moveTo(pos,to);
     if (isStarving(to)) clean(pos);
     if (isBreeding(to)) breed(pos,to);
 }
 
-enum type convertType(char type) {
+enum Type convertType(char type) {
 	switch (type) {
 	case 'w': return WOLF;
 	case 's': return SQUIRREL;
@@ -215,11 +215,11 @@ enum type convertType(char type) {
 	exit(EXIT_FAILURE);
 }
 
-void createWorld(world aWorld, FILE *input) {
-	// initialize world with zeros
-	memset(aWorld, 0, sizeof(world));
+void createWorld(World aWorld, FILE *input) {
+	// initialize World with zeros
+	memset(aWorld, 0, sizeof(World));
 
-	// read world size
+	// read World size
 	fscanf(input, "%d", &WORLD_SIZE);
 
 	int row;
@@ -233,7 +233,7 @@ void createWorld(world aWorld, FILE *input) {
 // blackTurn is 0 for red and 1 for blacks
 void play(int blackTurn) {
 	int i, j;
-	position pos;
+	Position pos;
 	for (i = 0; i < WORLD_SIZE; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
 			pos.row = i;
@@ -265,7 +265,7 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 	createWorld(old_world, input);
-	memcpy(new_world, old_world, sizeof(world));
+	memcpy(new_world, old_world, sizeof(World));
 	fclose(input);
 
 	WOLF_BREEDING_LEVEL = atoi(argv[2]);
@@ -276,9 +276,9 @@ int main(int argc, char **argv) {
 	int gen;
 	for (gen = 0; gen < number_generations; gen++) {
 		play(0);
-		memcpy(new_world, old_world, sizeof(world));
+		memcpy(new_world, old_world, sizeof(World));
 		play(1);
-		memcpy(new_world, old_world, sizeof(world));
+		memcpy(new_world, old_world, sizeof(World));
 	}
 
 	return 0;
