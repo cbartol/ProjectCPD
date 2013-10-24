@@ -3,6 +3,9 @@ BIN = bin
 
 all: clean create serial
 
+debug: clean create
+	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c -DPROJ_DEBUG=1 -g
+
 create:
 	mkdir -p $(BIN)
 	

@@ -2,7 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BLACK_TURN 0
+#define RED_TURN 1
 #define MAX 100
+#define isBlackTurn(t) ((t) == BLACK_TURN)
+#define isRedTurn(t) ((t) == RED_TURN)
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
@@ -41,6 +45,15 @@ int WOLF_STARVING_LEVEL;
 int WORLD_SIZE;
 World old_world;
 World new_world;
+
+
+#ifdef PROJ_DEBUG
+/* DEBUG declaration */
+	void printWord(World, int);
+	char reverseConvertType(enum Type);
+#endif
+
+
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(Position pos) {
@@ -99,11 +112,17 @@ Position getDestination(Position pos) {
 	int nAvailable = 0;
 	for (i = 0; i < 4; i++) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE && 
-		    	possible[i].column >= 0 && possible[i].column < WORLD_SIZE)
-		if (canMoveTo(pos, possible[i])) {
-			available[i] = 1;
-			nAvailable++;
+				possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
+			if (canMoveTo(pos, possible[i])) {
+				available[i] = 1;
+				nAvailable++;
+			}
 		}
+	}
+
+	//CANNOT MOVE!!
+	if(nAvailable == 0){
+		return pos;
 	}
 
 	int selected = numberOfPosition(pos) % nAvailable;
@@ -133,7 +152,7 @@ void breed(Position prev, Position cur) {
 
 /* the cell becomes empty */
 void clean(Position pos) {
-    enum Type type = new_world[pos.row][pos.column].type;
+    enum Type type = new_world[pos.row][pos.column].type; 
     if (type == WOLF || type == SQUIRREL) {
     	new_world[pos.row][pos.column].type = EMPTY;
     }
@@ -225,20 +244,19 @@ void createWorld(World aWorld, FILE *input) {
 	int row;
 	int column;
 	char type;
-	while (fscanf(input, "%d %d %c", &row, &column, &type)) {
-		old_world[row-1][column-1].type = convertType(type);
+	while (fscanf(input, "%d %d %c", &row, &column, &type) == 3) {
+		old_world[row][column].type = convertType(type);
 	}
 }
 
-// blackTurn is 0 for red and 1 for blacks
-void play(int blackTurn) {
+void play(int turn) {
 	int i, j;
 	Position pos;
 	for (i = 0; i < WORLD_SIZE; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
 			pos.row = i;
 			pos.column = j;
-			if ((!blackTurn && (i >> 1 == j >> 1)) || (blackTurn && (i >> 1 != j >> 1))) {
+			if ((isRedTurn(turn) && (i >> 1 == j >> 1)) || (isBlackTurn(turn) && (i >> 1 != j >> 1))) {
 				updateCell(pos);
 			}
 		}
@@ -274,12 +292,66 @@ int main(int argc, char **argv) {
 	int number_generations = atoi(argv[5]);
 
 	int gen;
+	#ifdef PROJ_DEBUG
+		fprintf(stdout, "NEW WORLD\n");
+		printWord(new_world, WORLD_SIZE);
+		fprintf(stdout, "\n\nOLD WORLD\n");
+		printWord(old_world, WORLD_SIZE);
+		fprintf(stdout,"----------------------------------\n");
+	#endif
 	for (gen = 0; gen < number_generations; gen++) {
-		play(0);
-		memcpy(new_world, old_world, sizeof(World));
-		play(1);
-		memcpy(new_world, old_world, sizeof(World));
+		play(BLACK_TURN);
+		memcpy(old_world, new_world, sizeof(World));
+		play(RED_TURN);
+		memcpy(old_world, new_world, sizeof(World));
+		#ifdef PROJ_DEBUG
+			fprintf(stdout, "NEW MIDDLE\n");
+			printWord(new_world, WORLD_SIZE);
+		#endif
 	}
-
+	#ifdef PROJ_DEBUG
+		fprintf(stdout,"\n\n----------------------------------\n");
+		fprintf(stdout, "NEW WORLD\n");
+		printWord(new_world, WORLD_SIZE);
+		fprintf(stdout, "\n\nOLD WORLD\n");
+		printWord(old_world, WORLD_SIZE);
+	#endif
 	return 0;
 }
+
+
+/*
+ **********************************
+ **                              **
+ **        DEBUG FUNCTIONS       **
+ **                              ** 
+ **********************************
+ */
+
+
+#ifdef PROJ_DEBUG
+	void printWord(World w, int w_size){
+		int i, j;
+		for (i = 0; i < WORLD_SIZE; i++) {
+			for (j = 0; j < WORLD_SIZE; j++) {
+				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
+			}
+			fprintf(stdout, "\n");
+		}
+	}
+
+	char reverseConvertType(enum Type type) {
+		switch (type) {
+			case EMPTY:            return ' ';
+			case WOLF:             return 'w';
+			case SQUIRREL:         return 's';
+			case ICE:              return 'i';
+			case TREE:             return 't';
+			case SQUIRREL_ON_TREE: return '$';
+		}
+
+		fprintf(stderr, "Unknown type: %d\n", type);
+		exit(EXIT_FAILURE);
+	}
+#endif
+
