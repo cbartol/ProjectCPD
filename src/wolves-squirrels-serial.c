@@ -97,7 +97,7 @@ int canMoveTo(Position from, Position to){
 /* returns a valid move */
 Position getDestination(Position pos) {
 	Position possible[4];
-	int available[4];
+	int available[4] = {0,0,0,0};
 
 	possible[TOP].row = pos.row - 1;
 	possible[TOP].column = pos.column;
@@ -164,6 +164,12 @@ void clean(Position pos) {
     new_world[pos.row][pos.column].breeding_period = 0;
 }
 
+/* compare two positions and return 1 if they are the same position */
+int isEqualPos(Position pos1, Position pos2){
+	return (pos1.row == pos2.row) && (pos1.column == pos2.column);
+}
+
+
 /* moves animal from the current Position to its destination */
 /* 	Duvida: aumenta-se o breeding period antes de mudar a posição ou depois?
 	O problema verifica-se se o lobo como o esquilo antes ou depois de aumentar?
@@ -206,7 +212,35 @@ void moveTo(Position from, Position to) {
     				    new_world[to.row][to.column].starvation_period);
     	}
     }
-    clean(from);
+
+
+#ifdef PROJ_DEBUG
+    printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
+    if(to_type == EMPTY){
+    	printf("empty\n");
+    	if (from_type != SQUIRREL_ON_TREE) {
+    		printf("normal\n");
+    		new_world[to.row][to.column].type = from_type;
+    	} else {
+    		printf("SQUIRREL_ON_TREE\n");
+    		new_world[to.row][to.column].type = SQUIRREL;
+    		new_world[from.row][from.column].type = TREE;
+    	}
+    } else if (to_type == TREE && from_type == SQUIRREL) {
+    	printf("from: SQUIRREL ; to: TREE\n");
+    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
+    } else if (to_type == TREE && from_type == SQUIRREL_ON_TREE) {
+    	printf("from: SQUIRREL_ON_TREE ; to: TREE\n");
+    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
+    	new_world[from.row][from.column].type = TREE;
+    } else {
+    	printf("not empty\n");
+    }
+    printf("\n\n");
+#endif
+    if (!isEqualPos(from,to)) {
+    	clean(from);
+    }
 }
 
 void updateCell(Position pos) {
@@ -295,8 +329,6 @@ int main(int argc, char **argv) {
 	#ifdef PROJ_DEBUG
 		fprintf(stdout, "NEW WORLD\n");
 		printWord(new_world, WORLD_SIZE);
-		fprintf(stdout, "\n\nOLD WORLD\n");
-		printWord(old_world, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
@@ -313,8 +345,6 @@ int main(int argc, char **argv) {
 		fprintf(stdout,"\n\n----------------------------------\n");
 		fprintf(stdout, "NEW WORLD\n");
 		printWord(new_world, WORLD_SIZE);
-		fprintf(stdout, "\n\nOLD WORLD\n");
-		printWord(old_world, WORLD_SIZE);
 	#endif
 	return 0;
 }
