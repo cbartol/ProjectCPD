@@ -85,11 +85,13 @@ int canMoveTo(Position from, Position to){
 	
 	// can't move a tree or ice cell nor it can move to a ice cell
 	if ((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE || fromCell == WOLF) && (toCell != ICE)) {
-		// wolf's can't go to trees
-		if ((fromCell == WOLF) && (toCell == TREE || toCell == SQUIRREL_ON_TREE)) { 
-			return 0;
-		}
-		return 1;
+	// 	wolf's can't go to trees
+        if((fromCell == WOLF) && (toCell == EMPTY || toCell == SQUIRREL))
+            return 1;
+        else return 0;
+        if((fromCell == SQUIRREL) && (toCell == EMPTY || toCell == TREE))
+            return 1;
+        else return 0;
 	}
 	return 0;
 }
@@ -150,7 +152,7 @@ Position getDestination(Position pos) {
     int selected = numberOfPosition(pos) % nAvailable;
 	for (i = 0; i < 4; i++) {
 		if (available[i] == n) {
-			if (selected == 0) {
+			if (selected == 0){
 				return possible[i];
 			}
 			selected--;
