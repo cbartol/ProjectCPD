@@ -263,7 +263,7 @@ void updateCell(Position pos) {
     }
 
 	Position to = getDestination(pos);
-	if (isEqualPos(pos, to)) {
+	if (!isEqualPos(pos, to)) {
 		moveTo(pos, to);
 	}
 	else {
