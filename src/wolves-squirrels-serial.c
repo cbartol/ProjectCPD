@@ -176,17 +176,22 @@ void copyPos(Position old, Position new, enum Type newType) {
 	new_world[new.row][new.column].starvation_period = old_world[old.row][old.column].starvation_period;
 }
 
-void chooseBestSquirrel(Position from, Position to) {
+// returns true if the animal that moved is the one that won
+int chooseBestSquirrel(Position from, Position to) {
 	new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
+	return new_world[to.row][to.column].breeding_period == old_world[from.row][from.column].breeding_period;
 }
 
-void chooseBestWolf(Position from, Position to) {
+// returns true if the animal that moved is the one that won
+int chooseBestWolf(Position from, Position to) {
 	if (old_world[from.row][from.column].starvation_period == new_world[to.row][to.column].starvation_period) {
 		new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
 	}
 	else if (old_world[from.row][from.column].starvation_period < new_world[to.row][to.column].starvation_period) {
 		new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period;
 	}
+	return 	new_world[to.row][to.column].breeding_period == old_world[to.row][to.column].breeding_period &&
+			new_world[to.row][to.column].starvation_period == old_world[to.row][to.column].starvation_period;
 }
 
 void addChild(Position pos) {
@@ -201,19 +206,21 @@ int moveTo(Position from, Position to) {
 	enum Type from_type = new_world[from.row][from.column].type;  
     enum Type to_type = new_world[to.row][to.column].type;
     int had_child = FALSE;
+    int was_eaten = FALSE;
 
-    new_world[to.row][to.column].has_moved = TRUE;
     if (isBreeding(from)) {
     	addChild(from);
-    	new_world[to.row][to.column].breeding_period = 0;
     	had_child = TRUE;
     }
 
     switch (from_type) {
    	case SQUIRREL:
    	case SQUIRREL_ON_TREE:
-   		if (to_type == WOLF) new_world[to.row][to.column].starvation_period = new_world[from.row][from.column].starvation_period;
-    	else if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) chooseBestSquirrel(from, to);
+   		if (to_type == WOLF) {
+   			new_world[to.row][to.column].starvation_period--;
+   			was_eaten = TRUE;
+    	}
+    	else if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) was_eaten = chooseBestSquirrel(from, to);
 		else copyPos(from, to, (to_type == TREE) ? SQUIRREL_ON_TREE : SQUIRREL);
 		break;
 
@@ -222,7 +229,7 @@ int moveTo(Position from, Position to) {
     		copyPos(from, to, WOLF);
     		new_world[to.row][to.column].starvation_period--;
     	}
-    	else if (to_type == WOLF) chooseBestWolf(from, to);
+    	else if (to_type == WOLF) was_eaten = chooseBestWolf(from, to);
     	else copyPos(from, to, WOLF);
     	break;
 
@@ -234,6 +241,11 @@ int moveTo(Position from, Position to) {
 	    printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
 	#endif
 
+	if (had_child && !was_eaten) {
+    	new_world[to.row][to.column].breeding_period = 0;
+	}
+
+	new_world[to.row][to.column].has_moved = TRUE;
 	return had_child;
 }
 
@@ -246,7 +258,6 @@ void updateCell(Position pos) {
 
 	Position to = getDestination(pos);
 	if (!equals(pos, to)) {
-		new_world[to.row][to.column].has_moved = TRUE;
 		// if the animal had a child
 		if (! moveTo(pos, to)) {
 			clean(pos);
