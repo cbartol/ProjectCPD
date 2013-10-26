@@ -200,7 +200,8 @@ void chooseBestWolf(Position from, Position to) {
 void addChild(Position pos) {
 	new_world[pos.row][pos.column].breeding_period = 0;
 	new_world[pos.row][pos.column].starvation_period = 0;
-	new_world[pos.row][pos.column].had_egg = 1;
+	new_world[pos.row][pos.column].had_egg = TRUE;
+	new_world[pos.row][pos.column].has_moved = 0;
 }
 
 /* moves animal from the current position to its destination */
