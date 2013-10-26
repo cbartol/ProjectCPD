@@ -49,7 +49,7 @@ World new_world;
 
 #ifdef PROJ_DEBUG
 /* DEBUG declaration */
-	void printDebugWorld(World, int);
+	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j);
 	char reverseConvertType(enum Type type);
 #endif
 
@@ -391,7 +391,7 @@ int main(int argc, char **argv) {
 	int gen;
 	#ifdef PROJ_DEBUG
 		fprintf(stdout, "init\n");
-		printDebugWorld(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
@@ -399,21 +399,21 @@ int main(int argc, char **argv) {
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN\n");
-			printDebugWorld(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 		play(BLACK_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN\n");
-			printDebugWorld(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 	}
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
 		fprintf(stdout, "END WORLD\n");
-		printDebugWorld(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, 0, 0, 4, 7);
 	#endif
 	printWorld(new_world);
 	return 0;
@@ -430,22 +430,22 @@ int main(int argc, char **argv) {
 
 
 #ifdef PROJ_DEBUG
-	void printDebugWorld(World w, int w_size){
+	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j){
 		int i, j;
 		printf(" _");
-		for (j = 0; j < WORLD_SIZE; ++j){
+		for (j = start_j; j < end_j; ++j){
 			fprintf(stdout, "%d_", j%10);
 		}
 		printf("\b\n");
-		for (i = 0; i < WORLD_SIZE; i++) {
+		for (i = start_i; i < end_i; i++) {
 			fprintf(stdout, "%d|", i%10);
-			for (j = 0; j < WORLD_SIZE; j++) {
+			for (j = start_j; j < end_j; j++) {
 				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
 			}
 			fprintf(stdout, "\b|%d\n", i%10);
 		}
 		printf("  ");
-		for (j = 0; j < WORLD_SIZE; ++j){
+		for (j = start_j; j < end_j; ++j){
 			fprintf(stdout, "%d ", j%10);
 		}
 		printf("\n");
