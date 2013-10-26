@@ -250,35 +250,10 @@ void moveTo(Position from, Position to) {
     }
 
 
-/*
+
 #ifdef PROJ_DEBUG
     printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
-    if(to_type == EMPTY){
-    	printf("empty\n");
-    	if (from_type != SQUIRREL_ON_TREE) {
-    		printf("normal\n");
-    		new_world[to.row][to.column].type = from_type;
-    	} else {
-    		printf("SQUIRREL_ON_TREE\n");
-    		new_world[to.row][to.column].type = SQUIRREL;
-    		new_world[from.row][from.column].type = TREE;
-    	}
-    } else if (to_type == TREE && from_type == SQUIRREL) {
-    	printf("from: SQUIRREL ; to: TREE\n");
-    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
-    } else if (to_type == TREE && from_type == SQUIRREL_ON_TREE) {
-    	printf("from: SQUIRREL_ON_TREE ; to: TREE\n");
-    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
-    	new_world[from.row][from.column].type = TREE;
-    } else {
-    	printf("not empty\n");
-    	if ( !((from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) && to_type == WOLF)) {
-    		new_world[to.row][to.column].type = from_type; //eat something
-    	}
-    }
-    printf("\n\n");
 #endif
-*/
 }
 
 void updateCell(Position pos) {
@@ -392,12 +367,14 @@ int main(int argc, char **argv) {
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN\n");
 			printWord(new_world, WORLD_SIZE);
+			fprintf(stdout, "\n\n");
 		#endif
 		play(BLACK_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN\n");
 			printWord(new_world, WORLD_SIZE);
+			fprintf(stdout, "\n\n");
 		#endif
 	}
 	#ifdef PROJ_DEBUG
