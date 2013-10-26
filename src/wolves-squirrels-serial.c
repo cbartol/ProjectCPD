@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
 		memcpy(old_world, new_world, sizeof(World));
 
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "RED_TURN\n");
+			fprintf(stdout, "RED_TURN %d\n", gen +1);
 			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
@@ -414,7 +414,7 @@ int main(int argc, char **argv) {
 		
 
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "BLACK_TURN\n");
+			fprintf(stdout, "BLACK_TURN %d\n", gen +1);
 			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
@@ -442,23 +442,22 @@ int main(int argc, char **argv) {
 #ifdef PROJ_DEBUG
 	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j){
 		int i, j;
-		printf(" _");
-		for (j = start_j; j < end_j; ++j){
-			fprintf(stdout, "%d_", j%10);
+		for (i = 0; i < WORLD_SIZE+1; ++i){
+			fprintf(stdout, "---");
 		}
-		printf("\b\n");
-		for (i = start_i; i < end_i; i++) {
-			fprintf(stdout, "%d|", i%10);
-			for (j = start_j; j < end_j; j++) {
-				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
-			}
-			fprintf(stdout, "\b|%d\n", i%10);
-		}
-		printf("  ");
-		for (j = start_j; j < end_j; ++j){
-			fprintf(stdout, "%d ", j%10);
+		printf("\n   ");
+		for (j = 0; j < WORLD_SIZE; ++j){
+			fprintf(stdout, "%2d|", j%100);
 		}
 		printf("\n");
+
+		for (i = 0; i < WORLD_SIZE; i++) {
+			fprintf(stdout, "%2d:", i%100);
+			for (j = 0; j < WORLD_SIZE; j++) {
+				fprintf(stdout, " %c|", reverseConvertType(w[i][j].type));
+			}
+			fprintf(stdout, "\n");
+		}
 	}
 #endif
 
