@@ -84,7 +84,7 @@ int canMoveTo(Position from, Position to){
 	int toCell = old_world[to.row][to.column].type;
 	
 	// can't move a tree or ice cell nor it can move to a ice cell
-	if ((fromCell == SQUIRREL || fromCell == WOLF) && (toCell != ICE)) {
+	if ((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE || fromCell == WOLF) && (toCell != ICE)) {
 		// wolf's can't go to trees
 		if ((fromCell == WOLF) && (toCell == TREE || toCell == SQUIRREL_ON_TREE)) { 
 			return 0;
@@ -148,7 +148,6 @@ Position getDestination(Position pos) {
     }
     
     int selected = numberOfPosition(pos) % nAvailable;
-    
 	for (i = 0; i < 4; i++) {
 		if (available[i] == n) {
 			if (selected == 0) {
@@ -273,6 +272,9 @@ void moveTo(Position from, Position to) {
     	new_world[from.row][from.column].type = TREE;
     } else {
     	printf("not empty\n");
+    	if ( !((from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) && to_type == WOLF)) {
+    		new_world[to.row][to.column].type = from_type; //eat something
+    	}
     }
     printf("\n\n");
 #endif
@@ -360,26 +362,38 @@ int main(int argc, char **argv) {
 	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
 	WOLF_STARVING_LEVEL = atoi(argv[4]);
 	int number_generations = atoi(argv[5]);
+	#ifdef PROJ_DEBUG
+		fprintf(stdout, "initial variables:\n");
+		fprintf(stdout,"\t- WOLF_BREEDING_LEVEL[%d]\n", WOLF_BREEDING_LEVEL);
+		fprintf(stdout,"\t- SQUIRREL_BREEDING_LEVEL[%d]\n", SQUIRREL_BREEDING_LEVEL);
+		fprintf(stdout,"\t- WOLF_STARVING_LEVEL[%d]\n", WOLF_STARVING_LEVEL);
+		fprintf(stdout,"\t- number_generations[%d]\n\n", number_generations);
+	#endif
+
 
 	int gen;
 	#ifdef PROJ_DEBUG
-		fprintf(stdout, "NEW WORLD\n");
+		fprintf(stdout, "init\n");
 		printWord(new_world, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
-		play(BLACK_TURN);
-		memcpy(old_world, new_world, sizeof(World));
 		play(RED_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "NEW MIDDLE\n");
+			fprintf(stdout, "RED_TURN\n");
+			printWord(new_world, WORLD_SIZE);
+		#endif
+		play(BLACK_TURN);
+		memcpy(old_world, new_world, sizeof(World));
+		#ifdef PROJ_DEBUG
+			fprintf(stdout, "BLACK_TURN\n");
 			printWord(new_world, WORLD_SIZE);
 		#endif
 	}
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
-		fprintf(stdout, "NEW WORLD\n");
+		fprintf(stdout, "END WORLD\n");
 		printWord(new_world, WORLD_SIZE);
 	#endif
 	return 0;
