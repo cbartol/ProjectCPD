@@ -288,8 +288,17 @@ void updateCell(Position pos) {
     }
 
 	Position to = getDestination(pos);
-	if (! isEqualPos(pos, to)) {
+	if (isEqualPos(pos, to)) {
 		moveTo(pos, to);
+	}
+	else {
+		if (new_world[pos.row][pos.column] == WOLF) {
+			max(new_world[pos.row][pos.column].starvation_period - 1, 0);
+		}
+
+		if (isStarving(pos)) {
+			clean(pos);
+		}
 	}
 }
 
