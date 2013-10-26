@@ -197,8 +197,10 @@ void chooseBestWolf(Position from, Position to) {
 	}
 }
 
-void addEgg(Position pos) {
-	new_world[pos.row][pos.column].type = new_world[pos.row][pos.column].type;
+void addChild(Position pos) {
+	new_world[pos.row][pos.column].breeding_period = 0;
+	new_world[pos.row][pos.column].starvation_period = 0;
+	new_world[pos.row][pos.column].had_egg = 1;
 }
 
 /* moves animal from the current position to its destination */
@@ -208,7 +210,7 @@ void moveTo(Position from, Position to) {
 
     new_world[to.row][to.column].has_moved = TRUE;
     if (isBreeding(from)) {
-    	new_world[from.row][from.column].had_egg = TRUE;
+    	addChild(from);
     	new_world[to.row][to.column].breeding_period = 0;
     }
 
