@@ -94,6 +94,21 @@ int canMoveTo(Position from, Position to){
 	return 0;
 }
 
+int isSquirrel(Position pos ){
+
+    if(new_world[pos.row][pos.column].type == SQUIRREL)
+        return 1;
+    else return 0;
+    
+}
+
+int isWolf(Position pos ){
+    
+    if(new_world[pos.row][pos.column].type == WOLF)
+        return 1;
+    else return 0;
+    
+}
 /* returns a valid move */
 Position getDestination(Position pos) {
 	Position possible[4];
@@ -114,9 +129,12 @@ Position getDestination(Position pos) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE && 
 				possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
 			if (canMoveTo(pos, possible[i])) {
+                if(isWolf(pos) && isSquirrel(posible[i]))
+                    return possible[i];
 				available[i] = 1;
 				nAvailable++;
 			}
+            
 		}
 	}
 
