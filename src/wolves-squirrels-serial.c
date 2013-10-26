@@ -351,6 +351,14 @@ int main(int argc, char **argv) {
 	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
 	WOLF_STARVING_LEVEL = atoi(argv[4]);
 	int number_generations = atoi(argv[5]);
+	#ifdef PROJ_DEBUG
+		fprintf(stdout, "initial variables:\n");
+		fprintf(stdout,"\t- WOLF_BREEDING_LEVEL[%d]\n", WOLF_BREEDING_LEVEL);
+		fprintf(stdout,"\t- SQUIRREL_BREEDING_LEVEL[%d]\n", SQUIRREL_BREEDING_LEVEL);
+		fprintf(stdout,"\t- WOLF_STARVING_LEVEL[%d]\n", WOLF_STARVING_LEVEL);
+		fprintf(stdout,"\t- number_generations[%d]\n\n", number_generations);
+	#endif
+
 
 	int gen;
 	#ifdef PROJ_DEBUG
