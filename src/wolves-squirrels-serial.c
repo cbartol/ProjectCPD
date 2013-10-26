@@ -84,7 +84,7 @@ int canMoveTo(Position from, Position to){
 	int toCell = old_world[to.row][to.column].type;
 	
 	// can't move a tree or ice cell nor it can move to a ice cell
-	if ((fromCell == SQUIRREL || fromCell == WOLF) && (toCell != ICE)) {
+	if ((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE || fromCell == WOLF) && (toCell != ICE)) {
 		// wolf's can't go to trees
 		if ((fromCell == WOLF) && (toCell == TREE || toCell == SQUIRREL_ON_TREE)) { 
 			return 0;
@@ -148,7 +148,6 @@ Position getDestination(Position pos) {
     }
     
     int selected = numberOfPosition(pos) % nAvailable;
-    
 	for (i = 0; i < 4; i++) {
 		if (available[i] == n) {
 			if (selected == 0) {
