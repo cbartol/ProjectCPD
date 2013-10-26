@@ -217,8 +217,10 @@ void moveTo(Position from, Position to) {
     						new_world[to.row][to.column].breeding_period);
     		}
     		else {
+    			new_world[to.row][to.column].type = to_type == TREE ? SQUIRREL_ON_TREE : SQUIRREL;
     			new_world[to.row][to.column].breeding_period = 
     					old_world[from.row][from.column].breeding_period + 1;
+    			new_world[to.row][to.column].starvation_period = 0;
     		}
     	}
     }
@@ -241,6 +243,7 @@ void moveTo(Position from, Position to) {
     }
 
 
+/*
 #ifdef PROJ_DEBUG
     printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
     if(to_type == EMPTY){
@@ -265,6 +268,7 @@ void moveTo(Position from, Position to) {
     }
     printf("\n\n");
 #endif
+*/
 }
 
 void updateCell(Position pos) {
