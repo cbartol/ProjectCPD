@@ -49,8 +49,8 @@ World new_world;
 
 #ifdef PROJ_DEBUG
 /* DEBUG declaration */
-	void printWord(World, int);
-	char reverseConvertType(enum Type);
+	void printDebugWorld(World, int);
+	char reverseConvertType(enum Type type);
 #endif
 
 
@@ -203,6 +203,11 @@ void moveTo(Position from, Position to) {
     	breed(from);
     	breeded = 1;
     }
+    #ifdef PROJ_DEBUG
+    	if (breeded) {
+    		fprintf(stdout, "breeding on pos[%d,%d]\n", from.row, from.column);
+    	}
+    #endif
 
     // only animals are moved
     if (from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) {
@@ -252,35 +257,10 @@ void moveTo(Position from, Position to) {
     }
 
 
-/*
+
 #ifdef PROJ_DEBUG
     printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
-    if(to_type == EMPTY){
-    	printf("empty\n");
-    	if (from_type != SQUIRREL_ON_TREE) {
-    		printf("normal\n");
-    		new_world[to.row][to.column].type = from_type;
-    	} else {
-    		printf("SQUIRREL_ON_TREE\n");
-    		new_world[to.row][to.column].type = SQUIRREL;
-    		new_world[from.row][from.column].type = TREE;
-    	}
-    } else if (to_type == TREE && from_type == SQUIRREL) {
-    	printf("from: SQUIRREL ; to: TREE\n");
-    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
-    } else if (to_type == TREE && from_type == SQUIRREL_ON_TREE) {
-    	printf("from: SQUIRREL_ON_TREE ; to: TREE\n");
-    	new_world[to.row][to.column].type = SQUIRREL_ON_TREE;
-    	new_world[from.row][from.column].type = TREE;
-    } else {
-    	printf("not empty\n");
-    	if ( !((from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) && to_type == WOLF)) {
-    		new_world[to.row][to.column].type = from_type; //eat something
-    	}
-    }
-    printf("\n\n");
 #endif
-*/
 }
 
 void updateCell(Position pos) {
@@ -290,12 +270,12 @@ void updateCell(Position pos) {
     }
 
 	Position to = getDestination(pos);
-	if (isEqualPos(pos, to)) {
+	if (!isEqualPos(pos, to)) {
 		moveTo(pos, to);
 	}
 	else {
 		if (new_world[pos.row][pos.column].type == WOLF) {
-			max(new_world[pos.row][pos.column].starvation_period - 1, 0);
+			new_world[pos.row][pos.column].starvation_period = max(new_world[pos.row][pos.column].starvation_period - 1, 0);
 		}
 
 		if (isStarving(pos)) {
@@ -314,6 +294,20 @@ enum Type convertType(char type) {
 	}
 
 	fprintf(stderr, "Unknown type: %c\n", type);
+	exit(EXIT_FAILURE);
+}
+
+char reverseConvertType(enum Type type) {
+	switch (type) {
+		case EMPTY:            return ' ';
+		case WOLF:             return 'w';
+		case SQUIRREL:         return 's';
+		case ICE:              return 'i';
+		case TREE:             return 't';
+		case SQUIRREL_ON_TREE: return '$';
+	}
+
+	fprintf(stderr, "Unknown type: %d\n", type);
 	exit(EXIT_FAILURE);
 }
 
@@ -341,6 +335,18 @@ void play(int turn) {
 			pos.column = j;
 			if ((isRedTurn(turn) && (i % 2 == j % 2)) || (isBlackTurn(turn) && (i % 2 != j % 2))) {
 				updateCell(pos);
+			}
+		}
+	}
+}
+
+/* prints the world with the correct output format */
+void printWorld(World w){
+	int i, j;
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (w[i][j].type != EMPTY){
+				fprintf(stdout, "%d %d %c\n", i,j, reverseConvertType(w[i][j].type));
 			}
 		}
 	}
@@ -385,7 +391,7 @@ int main(int argc, char **argv) {
 	int gen;
 	#ifdef PROJ_DEBUG
 		fprintf(stdout, "init\n");
-		printWord(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
@@ -393,20 +399,23 @@ int main(int argc, char **argv) {
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN\n");
-			printWord(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, WORLD_SIZE);
+			fprintf(stdout, "\n\n");
 		#endif
 		play(BLACK_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN\n");
-			printWord(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, WORLD_SIZE);
+			fprintf(stdout, "\n\n");
 		#endif
 	}
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
 		fprintf(stdout, "END WORLD\n");
-		printWord(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, WORLD_SIZE);
 	#endif
+	printWorld(new_world);
 	return 0;
 }
 
@@ -421,28 +430,25 @@ int main(int argc, char **argv) {
 
 
 #ifdef PROJ_DEBUG
-	void printWord(World w, int w_size){
+	void printDebugWorld(World w, int w_size){
 		int i, j;
+		printf(" _");
+		for (j = 0; j < WORLD_SIZE; ++j){
+			fprintf(stdout, "%d_", j%10);
+		}
+		printf("\b\n");
 		for (i = 0; i < WORLD_SIZE; i++) {
+			fprintf(stdout, "%d|", i%10);
 			for (j = 0; j < WORLD_SIZE; j++) {
 				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
 			}
-			fprintf(stdout, "\n");
+			fprintf(stdout, "\b|%d\n", i%10);
 		}
-	}
-
-	char reverseConvertType(enum Type type) {
-		switch (type) {
-			case EMPTY:            return ' ';
-			case WOLF:             return 'w';
-			case SQUIRREL:         return 's';
-			case ICE:              return 'i';
-			case TREE:             return 't';
-			case SQUIRREL_ON_TREE: return '$';
+		printf("  ");
+		for (j = 0; j < WORLD_SIZE; ++j){
+			fprintf(stdout, "%d ", j%10);
 		}
-
-		fprintf(stderr, "Unknown type: %d\n", type);
-		exit(EXIT_FAILURE);
+		printf("\n");
 	}
 #endif
 
