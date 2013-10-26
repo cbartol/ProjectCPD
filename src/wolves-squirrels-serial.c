@@ -49,8 +49,8 @@ World new_world;
 
 #ifdef PROJ_DEBUG
 /* DEBUG declaration */
-	void printWord(World, int);
-	char reverseConvertType(enum Type);
+	void printDebugWorld(World, int);
+	char reverseConvertType(enum Type type);
 #endif
 
 
@@ -295,6 +295,20 @@ enum Type convertType(char type) {
 	exit(EXIT_FAILURE);
 }
 
+char reverseConvertType(enum Type type) {
+	switch (type) {
+		case EMPTY:            return ' ';
+		case WOLF:             return 'w';
+		case SQUIRREL:         return 's';
+		case ICE:              return 'i';
+		case TREE:             return 't';
+		case SQUIRREL_ON_TREE: return '$';
+	}
+
+	fprintf(stderr, "Unknown type: %d\n", type);
+	exit(EXIT_FAILURE);
+}
+
 void createWorld(World aWorld, FILE *input) {
 	// initialize World with zeros
 	memset(aWorld, EMPTY, sizeof(World));
@@ -319,6 +333,18 @@ void play(int turn) {
 			pos.column = j;
 			if ((isRedTurn(turn) && (i % 2 == j % 2)) || (isBlackTurn(turn) && (i % 2 != j % 2))) {
 				updateCell(pos);
+			}
+		}
+	}
+}
+
+/* prints the world with the correct output format */
+void printWorld(World w){
+	int i, j;
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (w[i][j].type != EMPTY){
+				fprintf(stdout, "%d %d %c\n", i,j, reverseConvertType(w[i][j].type));
 			}
 		}
 	}
@@ -363,7 +389,7 @@ int main(int argc, char **argv) {
 	int gen;
 	#ifdef PROJ_DEBUG
 		fprintf(stdout, "init\n");
-		printWord(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
@@ -371,22 +397,23 @@ int main(int argc, char **argv) {
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN\n");
-			printWord(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 		play(BLACK_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN\n");
-			printWord(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 	}
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
 		fprintf(stdout, "END WORLD\n");
-		printWord(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, WORLD_SIZE);
 	#endif
+	printWorld(new_world);
 	return 0;
 }
 
@@ -401,7 +428,7 @@ int main(int argc, char **argv) {
 
 
 #ifdef PROJ_DEBUG
-	void printWord(World w, int w_size){
+	void printDebugWorld(World w, int w_size){
 		int i, j;
 		printf(" _");
 		for (j = 0; j < WORLD_SIZE; ++j){
@@ -420,20 +447,6 @@ int main(int argc, char **argv) {
 			fprintf(stdout, "%d ", j%10);
 		}
 		printf("\n");
-	}
-
-	char reverseConvertType(enum Type type) {
-		switch (type) {
-			case EMPTY:            return ' ';
-			case WOLF:             return 'w';
-			case SQUIRREL:         return 's';
-			case ICE:              return 'i';
-			case TREE:             return 't';
-			case SQUIRREL_ON_TREE: return '$';
-		}
-
-		fprintf(stderr, "Unknown type: %d\n", type);
-		exit(EXIT_FAILURE);
 	}
 #endif
 
