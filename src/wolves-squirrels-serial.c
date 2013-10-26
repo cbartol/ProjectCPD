@@ -52,7 +52,7 @@ World new_world;
 
 #ifdef PROJ_DEBUG
 /* DEBUG declaration */
-	void printDebugWorld(World, int);
+	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j);
 	char reverseConvertType(enum Type type);
 #endif
 
@@ -86,11 +86,12 @@ int canMoveTo(Position from, Position to){
 	
 	// can't move a tree or ice cell nor it can move to a ice cell
 	if ((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE || fromCell == WOLF) && (toCell != ICE)) {
-		// wolf's can't go to trees
-		if ((fromCell == WOLF) && (toCell == TREE || toCell == SQUIRREL_ON_TREE)) { 
-			return 0;
-		}
-		return 1;
+	// 	wolf's can't go to trees
+        if((fromCell == WOLF) && (toCell == EMPTY || toCell == SQUIRREL))
+            return 1;
+        else if((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE) && (toCell == EMPTY || toCell == TREE))
+            return 1;
+        else return 0;
 	}
 	return 0;
 }
@@ -117,7 +118,7 @@ Position getDestination(Position pos) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE &&
             possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
 			if (canMoveTo(pos, possible[i])) {
-                if(isWolf(pos) && isSquirrel(possible[i])){
+                if(old_world[pos.row][pos.column].type == WOLF && old_world[possible[i].row][possible[i].column].type == SQUIRREL){
                     available[i] = 2;
                     nSquirrels++;
                 }
@@ -141,7 +142,7 @@ Position getDestination(Position pos) {
     int selected = numberOfPosition(pos) % nAvailable;
 	for (i = 0; i < 4; i++) {
 		if (available[i] == n) {
-			if (selected == 0) {
+			if (selected == 0){
 				return possible[i];
 			}
 			selected--;
@@ -381,7 +382,7 @@ int main(int argc, char **argv) {
 
 	#ifdef PROJ_DEBUG
 		fprintf(stdout, "init\n");
-		printDebugWorld(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 
@@ -395,7 +396,7 @@ int main(int argc, char **argv) {
 
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN\n");
-			printDebugWorld(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 
@@ -407,7 +408,7 @@ int main(int argc, char **argv) {
 
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN\n");
-			printDebugWorld(new_world, WORLD_SIZE);
+			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
 	}
@@ -415,7 +416,7 @@ int main(int argc, char **argv) {
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
 		fprintf(stdout, "END WORLD\n");
-		printDebugWorld(new_world, WORLD_SIZE);
+		printDebugWorld(new_world, 0, 0, 4, 7);
 	#endif
 	printWorld(new_world);
 	return 0;
@@ -432,22 +433,22 @@ int main(int argc, char **argv) {
 
 
 #ifdef PROJ_DEBUG
-	void printDebugWorld(World w, int w_size){
+	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j){
 		int i, j;
 		printf(" _");
-		for (j = 0; j < WORLD_SIZE; ++j){
+		for (j = start_j; j < end_j; ++j){
 			fprintf(stdout, "%d_", j%10);
 		}
 		printf("\b\n");
-		for (i = 0; i < WORLD_SIZE; i++) {
+		for (i = start_i; i < end_i; i++) {
 			fprintf(stdout, "%d|", i%10);
-			for (j = 0; j < WORLD_SIZE; j++) {
+			for (j = start_j; j < end_j; j++) {
 				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
 			}
 			fprintf(stdout, "\b|%d\n", i%10);
 		}
 		printf("  ");
-		for (j = 0; j < WORLD_SIZE; ++j){
+		for (j = start_j; j < end_j; ++j){
 			fprintf(stdout, "%d ", j%10);
 		}
 		printf("\n");
