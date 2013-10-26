@@ -370,13 +370,13 @@ int main(int argc, char **argv) {
 		play(RED_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "BLACK_TURN\n");
+			fprintf(stdout, "RED_TURN\n");
 			printWord(new_world, WORLD_SIZE);
 		#endif
 		play(BLACK_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "RED_TURN\n");
+			fprintf(stdout, "BLACK_TURN\n");
 			printWord(new_world, WORLD_SIZE);
 		#endif
 	}
