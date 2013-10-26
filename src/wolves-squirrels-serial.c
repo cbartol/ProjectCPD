@@ -94,6 +94,21 @@ int canMoveTo(Position from, Position to){
 	return 0;
 }
 
+int isSquirrel(Position pos ){
+
+    if(new_world[pos.row][pos.column].type == SQUIRREL)
+        return 1;
+    else return 0;
+    
+}
+
+int isWolf(Position pos ){
+    
+    if(new_world[pos.row][pos.column].type == WOLF)
+        return 1;
+    else return 0;
+    
+}
 /* returns a valid move */
 Position getDestination(Position pos) {
 	Position possible[4];
@@ -110,22 +125,32 @@ Position getDestination(Position pos) {
 
 	int i;
 	int nAvailable = 0;
+    int nSquirrels = 0;
+    
 	for (i = 0; i < 4; i++) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE && 
 				possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
 			if (canMoveTo(pos, possible[i])) {
-				available[i] = 1;
-				nAvailable++;
-			}
+                if(isWolf(pos) && isSquirrel(possible[i])){
+                    available[i] = 2;
+                    nSquirrels++;
+                }
+				else {
+                    available[i] = 1;
+                    nAvailable++;
+                }
+            }
 		}
 	}
+    
+    if(nAvailable == 0 && nSquirrels == 0)
+        return pos;
 
-	//CANNOT MOVE!!
-	if(nAvailable == 0){
-		return pos;
-	}
-
-	int selected = numberOfPosition(pos) % nAvailable;
+    if(nSquirrels != 0)
+        nAvailable = nSquirrels;
+    
+    int selected = numberOfPosition(pos) % nAvailable;
+    
 	for (i = 0; i < 4; i++) {
 		if (available[i] == 1) {
 			if (selected == 0) {
