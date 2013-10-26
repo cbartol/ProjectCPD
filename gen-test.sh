@@ -61,7 +61,7 @@ then
 
 		# generating .out
 		./$SERIAL_PROGRAM $input $wolf_breeding_period $squirrel_breeding_period \
-				$wolf_starvation_period $number_generations > "${count}.out"
+				$wolf_starvation_period $number_generations > "${file}.out"
 	done
 else
 	echo "$SERIAL_PROGRAM doesn't exist."

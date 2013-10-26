@@ -22,4 +22,4 @@ clean:
 	rm -rf $(BIN) 2> /dev/null
 
 tests:
-	test-gen.sh
+	./gen-test.sh
