@@ -231,9 +231,18 @@ void moveTo(Position from, Position to) {
     		new_world[to.row][to.column].breeding_period = old_world[to.row][to.column].breeding_period + 1;
     	}
     	else if (to_type == WOLF) {
-    		new_world[to.row][to.column].starvation_period = 
-    				min(old_world[from.row][from.column].starvation_period,
-    				    new_world[to.row][to.column].starvation_period);
+    		if (old_world[from.row][from.column].starvation_period + 1 == new_world[to.row][to.column].starvation_period) {
+    			new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period,
+    			                                                   new_world[to.row][to.column].breeding_period);
+    		}
+    		else if (old_world[from.row][from.column].starvation_period + 1 < new_world[to.row][to.column].starvation_period) {
+    			new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period;
+    		}
+    	}
+    	else {
+    		new_world[to.row][to.column].type = WOLF;
+    		new_world[to.row][to.column].starvation_period = old_world[from.row][from.column].starvation_period + 1;
+    		new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period + 1;
     	}
     }
 
@@ -277,7 +286,9 @@ void updateCell(Position pos) {
     }
 
 	Position to = getDestination(pos);
-	moveTo(pos, to);
+	if (! isEqualPos(pos, to)) {
+		moveTo(pos, to);
+	}
 }
 
 enum Type convertType(char type) {
