@@ -137,17 +137,10 @@ Position getDestination(Position pos) {
 	return pos;
 }
 
-/* leaves a child in the previous Position */
-void breed(Position prev, Position cur) {
-    enum Type type = new_world[cur.row][cur.column].type;
-    if (type == SQUIRREL_ON_TREE || type == SQUIRREL) {
-    	new_world[prev.row][prev.column].type = SQUIRREL;
-    }
-    else {
-   	    new_world[prev.row][prev.column].type = WOLF;
-    }
-    new_world[prev.row][prev.column].starvation_period = 0;
-    new_world[prev.row][prev.column].breeding_period = 0;
+/* resets the periods in the position */
+void breed(Position pos) {
+    new_world[pos.row][pos.column].starvation_period = 0;
+    new_world[pos.row][pos.column].breeding_period = 0;
 }
 
 /* the cell becomes empty */
@@ -170,16 +163,21 @@ int isEqualPos(Position pos1, Position pos2){
 }
 
 
-/* moves animal from the current Position to its destination */
-/* 	Duvida: aumenta-se o breeding period antes de mudar a posição ou depois?
-	O problema verifica-se se o lobo como o esquilo antes ou depois de aumentar?
-	Outro problema é se o lobo como o esquilo antes ou depois de ter o filho?
-
-	Actualmente aumenta o breeding period depois
- 	e só tem o filho se continuar vivo depois de andar */
+/* moves animal from the current position to its destination */
 void moveTo(Position from, Position to) { 
 	enum Type from_type = old_world[from.row][from.column].type;  
     enum Type to_type = new_world[to.row][to.column].type;
+    int breeded = 0;
+
+    if (isStarving(from)) {
+    	clean(from);
+    	return;
+    }
+
+    if (isBreeding(from)) { 
+    	breed(from);
+    	breeded = 1;
+    }
 
     // only animals are moved
     if (from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) {
@@ -213,6 +211,10 @@ void moveTo(Position from, Position to) {
     	}
     }
 
+    if (!breeded) {
+    	clean(from);
+    }
+
 
 #ifdef PROJ_DEBUG
     printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
@@ -238,9 +240,6 @@ void moveTo(Position from, Position to) {
     }
     printf("\n\n");
 #endif
-    if (!isEqualPos(from,to)) {
-    	clean(from);
-    }
 }
 
 void updateCell(Position pos) {
@@ -249,10 +248,8 @@ void updateCell(Position pos) {
     	return;
     }
 
-    Position to = getDestination(pos);
-    moveTo(pos,to);
-    if (isStarving(to)) clean(pos);
-    if (isBreeding(to)) breed(pos,to);
+	Position to = getDestination(pos);
+	moveTo(pos, to);
 }
 
 enum Type convertType(char type) {
@@ -270,7 +267,7 @@ enum Type convertType(char type) {
 
 void createWorld(World aWorld, FILE *input) {
 	// initialize World with zeros
-	memset(aWorld, 0, sizeof(World));
+	memset(aWorld, EMPTY, sizeof(World));
 
 	// read World size
 	fscanf(input, "%d", &WORLD_SIZE);
@@ -290,7 +287,7 @@ void play(int turn) {
 		for (j = 0; j < WORLD_SIZE; j++) {
 			pos.row = i;
 			pos.column = j;
-			if ((isRedTurn(turn) && (i >> 1 == j >> 1)) || (isBlackTurn(turn) && (i >> 1 != j >> 1))) {
+			if ((isRedTurn(turn) && (i % 2 == j % 2)) || (isBlackTurn(turn) && (i % 2 != j % 2))) {
 				updateCell(pos);
 			}
 		}
