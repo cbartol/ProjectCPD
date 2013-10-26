@@ -338,10 +338,10 @@ void moving() {
 			if (new_world[i][j].has_moved) {
 				new_world[i][j].has_moved = FALSE;
 				new_world[i][j].breeding_period++;
+			}
 
-				if (new_world[i][j].type == WOLF) {
-					new_world[i][j].starvation_period++;
-				}
+			if (new_world[i][j].type == WOLF) {
+				new_world[i][j].starvation_period++;
 			}
 		}
 	}
