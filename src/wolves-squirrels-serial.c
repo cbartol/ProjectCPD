@@ -231,11 +231,11 @@ void moveTo(Position from, Position to) {
     	}
     	else if (to_type == WOLF) {
     		if (old_world[from.row][from.column].starvation_period + 1 == new_world[to.row][to.column].starvation_period) {
-    			new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period,
+    			new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period + 1,
     			                                                   new_world[to.row][to.column].breeding_period);
     		}
     		else if (old_world[from.row][from.column].starvation_period + 1 < new_world[to.row][to.column].starvation_period) {
-    			new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period;
+    			new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period + 1;
     		}
     	}
     	else {
