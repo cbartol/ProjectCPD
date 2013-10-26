@@ -247,7 +247,7 @@ void updateCell(Position pos) {
 	if (!equals(pos, to)) {
 		new_world[to.row][to.column].has_moved = TRUE;
 		moveTo(pos, to);
-		clean(from);
+		clean(pos);
 	}
 }
 
@@ -342,6 +342,20 @@ void moving() {
 			}
 		}
 	}
+}
+
+char reverseConvertType(enum Type type) {
+	switch (type) {
+		case EMPTY:            return ' ';
+		case WOLF:             return 'w';
+		case SQUIRREL:         return 's';
+		case ICE:              return 'i';
+		case TREE:             return 't';
+		case SQUIRREL_ON_TREE: return '$';
+	}
+
+	fprintf(stderr, "Unknown type: %d\n", type);
+	exit(EXIT_FAILURE);
 }
 
 /*
