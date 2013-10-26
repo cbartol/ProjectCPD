@@ -264,6 +264,9 @@ void moveTo(Position from, Position to) {
     	new_world[from.row][from.column].type = TREE;
     } else {
     	printf("not empty\n");
+    	if ( !((from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) && to_type == WOLF)) {
+    		new_world[to.row][to.column].type = from_type; //eat something
+    	}
     }
     printf("\n\n");
 #endif
@@ -352,23 +355,27 @@ int main(int argc, char **argv) {
 
 	int gen;
 	#ifdef PROJ_DEBUG
-		fprintf(stdout, "NEW WORLD\n");
+		fprintf(stdout, "init\n");
 		printWord(new_world, WORLD_SIZE);
 		fprintf(stdout,"----------------------------------\n");
 	#endif
 	for (gen = 0; gen < number_generations; gen++) {
-		play(BLACK_TURN);
-		memcpy(old_world, new_world, sizeof(World));
 		play(RED_TURN);
 		memcpy(old_world, new_world, sizeof(World));
 		#ifdef PROJ_DEBUG
-			fprintf(stdout, "NEW MIDDLE\n");
+			fprintf(stdout, "BLACK_TURN\n");
+			printWord(new_world, WORLD_SIZE);
+		#endif
+		play(BLACK_TURN);
+		memcpy(old_world, new_world, sizeof(World));
+		#ifdef PROJ_DEBUG
+			fprintf(stdout, "RED_TURN\n");
 			printWord(new_world, WORLD_SIZE);
 		#endif
 	}
 	#ifdef PROJ_DEBUG
 		fprintf(stdout,"\n\n----------------------------------\n");
-		fprintf(stdout, "NEW WORLD\n");
+		fprintf(stdout, "END WORLD\n");
 		printWord(new_world, WORLD_SIZE);
 	#endif
 	return 0;
