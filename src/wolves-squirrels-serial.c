@@ -128,7 +128,7 @@ Position getDestination(Position pos) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE &&
             possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
 			if (canMoveTo(pos, possible[i])) {
-                if(isWolf(pos) && isSquirrel(possible[i])){
+                if(old_world[pos.row][pos.column].type == WOLF && old_world[possible[i].row][possible[i].column].type == SQUIRREL){
                     available[i] = 2;
                     nSquirrels++;
                 }
