@@ -94,26 +94,21 @@ int canMoveTo(Position from, Position to){
 	return 0;
 }
 
+/* returns 1 if pos is a squirrel */
 int isSquirrel(Position pos ){
-
-    if(new_world[pos.row][pos.column].type == SQUIRREL)
-        return 1;
-    else return 0;
-    
+    return new_world[pos.row][pos.column].type == SQUIRREL;
 }
 
+/* returns 1 if pos is a wolf */
 int isWolf(Position pos ){
-    
-    if(new_world[pos.row][pos.column].type == WOLF)
-        return 1;
-    else return 0;
-    
+    return new_world[pos.row][pos.column].type == WOLF;
 }
+
 /* returns a valid move */
 Position getDestination(Position pos) {
 	Position possible[4];
 	int available[4] = {0,0,0,0};
-
+    
 	possible[TOP].row = pos.row - 1;
 	possible[TOP].column = pos.column;
 	possible[RIGHT].row = pos.row;
@@ -122,14 +117,14 @@ Position getDestination(Position pos) {
 	possible[BOTTOM].column = pos.column;
 	possible[LEFT].row = pos.row;
 	possible[LEFT].column = pos.column - 1;
-
+    
 	int i;
 	int nAvailable = 0;
     int nSquirrels = 0;
     
 	for (i = 0; i < 4; i++) {
-		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE && 
-				possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
+		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE &&
+            possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
 			if (canMoveTo(pos, possible[i])) {
                 if(isWolf(pos) && isSquirrel(possible[i])){
                     available[i] = 2;
@@ -145,14 +140,17 @@ Position getDestination(Position pos) {
     
     if(nAvailable == 0 && nSquirrels == 0)
         return pos;
-
-    if(nSquirrels != 0)
+    
+    int n = 1;
+    if(nSquirrels != 0){
         nAvailable = nSquirrels;
+        n = 2;
+    }
     
     int selected = numberOfPosition(pos) % nAvailable;
     
 	for (i = 0; i < 4; i++) {
-		if (available[i] == 1) {
+		if (available[i] == n) {
 			if (selected == 0) {
 				return possible[i];
 			}
@@ -161,6 +159,7 @@ Position getDestination(Position pos) {
 	}
 	return pos;
 }
+
 
 /* resets the periods in the position */
 void breed(Position pos) {
