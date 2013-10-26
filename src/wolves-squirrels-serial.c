@@ -201,6 +201,11 @@ void moveTo(Position from, Position to) {
     	breed(from);
     	breeded = 1;
     }
+    #ifdef PROJ_DEBUG
+    	if (breeded) {
+    		fprintf(stdout, "breeding on pos[%d,%d]\n", from.row, from.column);
+    	}
+    #endif
 
     // only animals are moved
     if (from_type == SQUIRREL || from_type == SQUIRREL_ON_TREE) {
@@ -268,7 +273,7 @@ void updateCell(Position pos) {
 	}
 	else {
 		if (new_world[pos.row][pos.column].type == WOLF) {
-			max(new_world[pos.row][pos.column].starvation_period - 1, 0);
+			new_world[pos.row][pos.column].starvation_period = max(new_world[pos.row][pos.column].starvation_period - 1, 0);
 		}
 
 		if (isStarving(pos)) {
@@ -398,12 +403,23 @@ int main(int argc, char **argv) {
 #ifdef PROJ_DEBUG
 	void printWord(World w, int w_size){
 		int i, j;
+		printf(" _");
+		for (j = 0; j < WORLD_SIZE; ++j){
+			fprintf(stdout, "%d_", j%10);
+		}
+		printf("\b\n");
 		for (i = 0; i < WORLD_SIZE; i++) {
+			fprintf(stdout, "%d|", i%10);
 			for (j = 0; j < WORLD_SIZE; j++) {
 				fprintf(stdout, "%c ", reverseConvertType(w[i][j].type));
 			}
-			fprintf(stdout, "\n");
+			fprintf(stdout, "\b|%d\n", i%10);
 		}
+		printf("  ");
+		for (j = 0; j < WORLD_SIZE; ++j){
+			fprintf(stdout, "%d ", j%10);
+		}
+		printf("\n");
 	}
 
 	char reverseConvertType(enum Type type) {
