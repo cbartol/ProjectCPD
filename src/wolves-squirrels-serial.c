@@ -245,8 +245,9 @@ void updateCell(Position pos) {
 
 	Position to = getDestination(pos);
 	if (!equals(pos, to)) {
-		moveTo(pos, to);
 		new_world[to.row][to.column].has_moved = TRUE;
+		moveTo(pos, to);
+		clean(from);
 	}
 }
 
@@ -308,7 +309,7 @@ void generateChildren() {
 	int i, j;
 	for (i = 0; i < WORLD_SIZE; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
-			if (new_world[i][j].eggType != NONE) {
+			if (new_world[i][j].eggType != EMPTY) {
 				Position pos = { .row = i, .column = j };
 				breed(pos, new_world[i][j].eggType);
 			}
