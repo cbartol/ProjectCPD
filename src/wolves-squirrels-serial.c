@@ -292,7 +292,7 @@ void updateCell(Position pos) {
 		moveTo(pos, to);
 	}
 	else {
-		if (new_world[pos.row][pos.column] == WOLF) {
+		if (new_world[pos.row][pos.column].type == WOLF) {
 			max(new_world[pos.row][pos.column].starvation_period - 1, 0);
 		}
 

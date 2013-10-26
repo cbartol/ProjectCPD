@@ -1,5 +1,6 @@
 SRC = src
 BIN = bin
+GEN_TESTS = test/generated
 
 all: clean create serial
 
@@ -20,6 +21,7 @@ mpi:
 
 clean:
 	rm -rf $(BIN) 2> /dev/null
+	rm -rf $(GEN_TESTS) 2> /dev/null
 
 tests:
 	./gen-test.sh

@@ -28,7 +28,7 @@ then
 		file="${OUTPUT_DIR}/${count}"
 
 		# generating .in
-		pieces=('$' 'w' 's' 'i' 't')
+		pieces=('$' 'w' 's' 'i' 't' 'e')
 		input="${file}.in"
 
 		world_size=$RANDOM
@@ -39,9 +39,11 @@ then
 			for (( j = 0; j < $world_size; j++ )); do
 				pos=$RANDOM
 				let "pos %= ${#pieces[@]}"
-				printf "%s" "${pieces[${pos}]}" >> $input				
+				if [ ${pieces[${pos}]} != 'e' ]
+				then
+					echo "$i $j ${pieces[${pos}]}" >> $input
+				fi			
 			done
-			echo "" >> $input
 		done
 
 		# generating .header
