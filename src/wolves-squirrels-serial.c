@@ -88,8 +88,7 @@ int canMoveTo(Position from, Position to){
 	// 	wolf's can't go to trees
         if((fromCell == WOLF) && (toCell == EMPTY || toCell == SQUIRREL))
             return 1;
-        else return 0;
-        if((fromCell == SQUIRREL) && (toCell == EMPTY || toCell == TREE))
+        else if((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE) && (toCell == EMPTY || toCell == TREE))
             return 1;
         else return 0;
 	}
