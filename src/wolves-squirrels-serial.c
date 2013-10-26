@@ -53,8 +53,8 @@ World new_world;
 #ifdef PROJ_DEBUG
 /* DEBUG declaration */
 	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j);
-	char reverseConvertType(enum Type type);
 #endif
+char reverseConvertType(enum Type type);
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(Position pos) {
