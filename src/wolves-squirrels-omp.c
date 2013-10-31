@@ -113,7 +113,6 @@ void init(FILE *file, char **argv) {
 	lock_world = malloc(sizeof(omp_lock_t *) * WORLD_SIZE);
 
 	int i;
-	#pragma omp parallel for private(i)
 	for (i = 0; i < WORLD_SIZE; i++) {
 		new_world[i] = newWorld + i*WORLD_SIZE;
 		old_world[i] = oldWorld + i*WORLD_SIZE;
