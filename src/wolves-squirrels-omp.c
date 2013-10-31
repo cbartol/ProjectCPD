@@ -7,7 +7,6 @@
 #define RED_TURN 1
 #define FALSE 0
 #define TRUE 1
-#define MAX 1000
 #define isBlackTurn(t) ((t) == BLACK_TURN)
 #define isRedTurn(t) ((t) == RED_TURN)
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -30,12 +29,12 @@ enum Type {
 	SQUIRREL_ON_TREE = 5
 };
 
-typedef struct {
+typedef struct world_t {
 	enum Type type;
 	int breeding_period;
 	int starvation_period;
 	int has_moved;
-} World[MAX][MAX];
+} **World;
 
 typedef struct {
 	int row;
@@ -58,18 +57,19 @@ char reverseConvertType(enum Type type);
 
 /* returns 1 if animal is breeding, 0 otherwise */
 int isBreeding(Position pos) {
-	if (new_world[pos.row][pos.column].type == WOLF) {
-		return new_world[pos.row][pos.column].breeding_period == WOLF_BREEDING_LEVEL;
-	} else if (new_world[pos.row][pos.column].type == SQUIRREL) {
-		return new_world[pos.row][pos.column].breeding_period == SQUIRREL_BREEDING_LEVEL;
+	if (old_world[pos.row][pos.column].type == WOLF) {
+		return old_world[pos.row][pos.column].breeding_period >= WOLF_BREEDING_LEVEL;
+	}
+	else if (old_world[pos.row][pos.column].type == SQUIRREL || old_world[pos.row][pos.column].type == SQUIRREL_ON_TREE) {
+		return old_world[pos.row][pos.column].breeding_period >= SQUIRREL_BREEDING_LEVEL;
 	}
 	return 0;
 }
 
 /* returns 1 if wolf is starving, 0 otherwise */
 int isStarving(Position pos) {
-	return new_world[pos.row][pos.column].type == WOLF ? 
-		new_world[pos.row][pos.column].starvation_period == WOLF_STARVING_LEVEL :
+	return old_world[pos.row][pos.column].type == WOLF ? 
+		old_world[pos.row][pos.column].starvation_period >= WOLF_STARVING_LEVEL :
 		0;
 }
 
@@ -112,7 +112,7 @@ Position getDestination(Position pos) {
 	int i;
 	int nAvailable = 0;
     int nSquirrels = 0;
-    
+
 	for (i = 0; i < 4; i++) {
 		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE &&
             possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
@@ -174,80 +174,76 @@ void copyPos(Position old, Position new, enum Type newType) {
 	new_world[new.row][new.column].type = newType;
 	new_world[new.row][new.column].breeding_period = old_world[old.row][old.column].breeding_period;
 	new_world[new.row][new.column].starvation_period = old_world[old.row][old.column].starvation_period;
+	new_world[new.row][new.column].has_moved = TRUE;
 }
 
-// returns true if the animal that moved is the one that won
-int chooseBestSquirrel(Position from, Position to) {
+// returns true if the animal has moved
+void chooseBestSquirrel(Position from, Position to) {
 	new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
-	return new_world[to.row][to.column].breeding_period == old_world[from.row][from.column].breeding_period;
 }
 
-// returns true if the animal that moved is the one that won
-int chooseBestWolf(Position from, Position to) {
+// returns true if the animal wasn't eaten
+void chooseBestWolf(Position from, Position to) {
 	if (old_world[from.row][from.column].starvation_period == new_world[to.row][to.column].starvation_period) {
 		new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
 	} else if (old_world[from.row][from.column].starvation_period < new_world[to.row][to.column].starvation_period) {
 		new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period;
+		new_world[to.row][to.column].starvation_period = old_world[from.row][from.column].starvation_period;
 	}
-	return 	new_world[to.row][to.column].breeding_period == old_world[to.row][to.column].breeding_period &&
-			new_world[to.row][to.column].starvation_period == old_world[to.row][to.column].starvation_period;
 }
 
 void addChild(Position pos) {
 	new_world[pos.row][pos.column].breeding_period = 0;
 	new_world[pos.row][pos.column].starvation_period = 0;
-	new_world[pos.row][pos.column].has_moved = 0;
+	new_world[pos.row][pos.column].has_moved = FALSE;
 }
 
 /* moves animal from the current position to its destination */
 
 int moveTo(Position from, Position to) { 
-	enum Type from_type = new_world[from.row][from.column].type;  
+	enum Type from_type = old_world[from.row][from.column].type;  
     int had_child = FALSE;
-    int was_eaten = FALSE;
 
     if (isBreeding(from)) {
     	addChild(from);
     	had_child = TRUE;
+    	old_world[from.row][from.column].breeding_period = 0;
     }
 
-    #pragma omp critical (banana)
-    {
-	    enum Type to_type = new_world[to.row][to.column].type;
-	    switch (from_type) {
-	   	case SQUIRREL:
-	   	case SQUIRREL_ON_TREE:
-	   		if (to_type == WOLF) {
-	   			new_world[to.row][to.column].starvation_period--;
-	   			was_eaten = TRUE;
-	    	}
-	    	else if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) was_eaten = chooseBestSquirrel(from, to);
-			else copyPos(from, to, (to_type == TREE) ? SQUIRREL_ON_TREE : SQUIRREL);
-			break;
-
-		case WOLF:
-			if (to_type == SQUIRREL) {
-	    		copyPos(from, to, WOLF);
-	    		new_world[to.row][to.column].starvation_period--;
-	    	}
-	    	else if (to_type == WOLF) was_eaten = chooseBestWolf(from, to);
-	    	else copyPos(from, to, WOLF);
-	    	break;
-
-	    default:
-	    	fprintf(stderr, "Can't move %d!", from_type);
-	    }
-
-		#ifdef PROJ_DEBUG
-		    printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
-		#endif
-
-		if (had_child && !was_eaten) {
-	    	new_world[to.row][to.column].breeding_period = 0;
+    enum Type to_type = new_world[to.row][to.column].type;
+    switch (from_type) {
+   	case SQUIRREL:
+   	case SQUIRREL_ON_TREE:
+   		if (to_type == WOLF) {
+   			new_world[to.row][to.column].starvation_period = 0;
+    	} else if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) {
+			chooseBestSquirrel(from, to);
+			new_world[to.row][to.column].has_moved = TRUE;	
+		} else if (to_type == EMPTY || to_type == TREE) {
+			copyPos(from, to, (to_type == TREE) ? SQUIRREL_ON_TREE : SQUIRREL);
 		}
+		break;
 
-		new_world[to.row][to.column].has_moved = TRUE;
-	}
+	case WOLF:
+		if (to_type == SQUIRREL) {
+    		copyPos(from, to, WOLF);
+    		new_world[to.row][to.column].starvation_period = 0;
+    	} else if (to_type == WOLF) {
+    	 	chooseBestWolf(from, to);
+    	 	new_world[to.row][to.column].has_moved = TRUE;
+    	} else if (to_type == EMPTY) { 
+    		copyPos(from, to, WOLF);
+    	}
+    	break;
+
+    default:
+    	fprintf(stderr, "Can't move %d!", from_type);
+    }
+
+	#ifdef PROJ_DEBUG
+	    printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
+	#endif
+
 	return had_child;
 }
 
@@ -260,8 +256,8 @@ void updateCell(Position pos) {
 
 	Position to = getDestination(pos);
 	if (!equals(pos, to)) {
-		// if the animal had a child
-		if (! moveTo(pos, to)) {
+		int no_child = !moveTo(pos, to);
+		if (no_child) {
 			clean(pos);
 		}
 	}
@@ -280,32 +276,50 @@ enum Type convertType(char type) {
 	exit(EXIT_FAILURE);
 }
 
-void createWorld(World aWorld, FILE *input) {
-	// initialize World with zeros
-	memset(aWorld, EMPTY, sizeof(World));
-
+void createWorld(FILE *input) {
 	// read World size
 	fscanf(input, "%d", &WORLD_SIZE);
+
+	struct world_t *newWorld = malloc(sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
+	struct world_t *oldWorld = malloc(sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
+	new_world = malloc(sizeof(struct world_t*) * WORLD_SIZE);
+	old_world = malloc(sizeof(struct world_t*) * WORLD_SIZE);
+
+	int i;
+	#pragma omp parallel for private(i)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		new_world[i] = newWorld + i*WORLD_SIZE;
+		old_world[i] = oldWorld + i*WORLD_SIZE;
+	}
+
+	// initialize World with zeros
+	memset(oldWorld, 0, sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
+	memset(newWorld, 0, sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
 
 	int row;
 	int column;
 	char type;
+	// initialize old world with map
 	while (fscanf(input, "%d %d %c", &row, &column, &type) == 3) {
 		old_world[row][column].type = convertType(type);
+		new_world[row][column].type = convertType(type);
 	}
+
+	#ifdef PROJ_DEBUG
+		printDebugWorld(old_world, 0, 0, 0, 0);
+	#endif
 }
 
 void play(int turn) {
 	int i, j;
 	Position pos;
-
-	#pragma omp parallel for private(pos)
+	#pragma omp parallel for private(i, j, pos)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		#pragma omp parallel for 
 		for (j = 0; j < WORLD_SIZE; j++) {
 			pos.row = i;
 			pos.column = j;
 			if ((isRedTurn(turn) && (i % 2 == j % 2)) || (isBlackTurn(turn) && (i % 2 != j % 2))) {
+				#pragma omp critical (banana)
 				updateCell(pos);
 			}
 		}
@@ -326,13 +340,16 @@ void printWorld(World w){
 
 void killAnimals() {
 	int i, j;
-	#pragma omp parallel for
+	#pragma omp parallel for private(i, j)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		#pragma omp parallel for
 		for (j = 0; j < WORLD_SIZE; j++) {
-			if (new_world[i][j].type == WOLF && new_world[i][j].starvation_period == WOLF_STARVING_LEVEL) {
-				Position pos = { .row = i, .column = j };
+			Position pos = { .row = i, .column = j };
+			if (isStarving(pos)) {
 				clean(pos);
+				
+				#ifdef PROJ_DEBUG
+					fprintf(stdin, "Morreu de fome o %d %d\n", pos.row, pos.column);
+				#endif
 			}
 		}
 	}
@@ -340,10 +357,8 @@ void killAnimals() {
 
 void moving() {
 	int i, j;
-
-	#pragma omp parallel for 
+	#pragma omp parallel for private(i, j)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		#pragma omp parallel for
 		for (j = 0; j < WORLD_SIZE; j++) {
 			if (new_world[i][j].has_moved) {
 				new_world[i][j].has_moved = FALSE;
@@ -371,6 +386,14 @@ char reverseConvertType(enum Type type) {
 	exit(EXIT_FAILURE);
 }
 
+void copyWorld(World old, World new) {
+	int i;
+	#pragma omp parallel for private(i)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		memcpy(old[i], new[i], sizeof(struct world_t) * WORLD_SIZE);
+	}
+}
+
 /*
 	arg[1] = filename
 	arg[2] = wolf_breeding_period
@@ -391,8 +414,7 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	createWorld(old_world, input);
-	memcpy(new_world, old_world, sizeof(World));
+	createWorld(input);
 	fclose(input);
 
 	WOLF_BREEDING_LEVEL = atoi(argv[2]);
@@ -419,11 +441,11 @@ int main(int argc, char **argv) {
 
 	int gen;
 	for (gen = 0; gen < number_generations; gen++) {
-		killAnimals(); // parallel
-		memcpy(old_world, new_world, sizeof(World));
+		killAnimals();
+		copyWorld(old_world, new_world);
 
-		play(RED_TURN); // parallel
-		memcpy(old_world, new_world, sizeof(World));
+		play(RED_TURN);
+		copyWorld(old_world, new_world);
 
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "RED_TURN %d\n", gen +1);
@@ -431,15 +453,19 @@ int main(int argc, char **argv) {
 			fprintf(stdout, "\n\n");
 		#endif
 
-		play(BLACK_TURN); // parallel
-		moving(); // parallel
-		memcpy(old_world, new_world, sizeof(World));
+		play(BLACK_TURN);
+		copyWorld(old_world, new_world);
 
 		#ifdef PROJ_DEBUG
 			fprintf(stdout, "BLACK_TURN %d\n", gen +1);
 			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
 			fprintf(stdout, "\n\n");
 		#endif
+
+		moving();
+		copyWorld(old_world, new_world);
+
+		
 	}
 
 	// ends measurement
@@ -480,7 +506,7 @@ int main(int argc, char **argv) {
 		for (i = 0; i < WORLD_SIZE; i++) {
 			fprintf(stdout, "%2d:", i%100);
 			for (j = 0; j < WORLD_SIZE; j++) {
-				fprintf(stdout, " %c|", reverseConvertType(w[i][j].type));
+				fprintf(stdout, "%c", reverseConvertType(w[i][j].type));
 			}
 			fprintf(stdout, "\n");
 		}

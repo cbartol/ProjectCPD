@@ -2,22 +2,23 @@ SRC = src
 BIN = bin
 GEN_TESTS = test/generated
 
-all: clean create serial
+all: clean create serial omp
 
 debug: clean create
-	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c -DPROJ_DEBUG=1 -g
+	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c -fopenmp -DPROJ_DEBUG=1 -g3
+	gcc -Wall -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp -DPROJ_DEBUG=1 -g3
 
 create:
 	mkdir -p $(BIN)
 	
 serial:
-	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c
+	gcc -Wall -O3 -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c -fopenmp
 
 omp:
-	gcc -ansi -pedantic -Wall -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp
+	gcc -Wall -O3 -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp
 
 mpi:
-	gcc -ansi -pedantic -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c
+	gcc -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c
 
 clean:
 	rm -rf $(BIN) 2> /dev/null
