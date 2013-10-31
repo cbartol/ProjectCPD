@@ -489,10 +489,13 @@ void playGen() {
 
 	// Red sub-generation
 	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			if (isRedGen(i, j)) {
-				updatePos(i, j);
-			}
+		// for (j = 0; j < WORLD_SIZE; j++) {
+		// 	if (isRedGen(i, j)) {
+		// 		updatePos(i, j);
+		// 	}
+		// }
+		for (j = (i % 2); j < WORLD_SIZE; j+=2) {
+			updatePos(i, j);
 		}
 	}
 
@@ -501,10 +504,13 @@ void playGen() {
 
 	// Black sub-generation
 	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			if (isBlackGen(i, j)) {
-				updatePos(i, j);
-			}
+		// for (j = 0; j < WORLD_SIZE; j++) {
+		// 	if (isBlackGen(i, j)) {
+		// 		updatePos(i, j);
+		// 	}
+		// }
+		for (j = !(i % 2); j < WORLD_SIZE; j+=2) {
+			updatePos(i, j);
 		}
 	}
 
