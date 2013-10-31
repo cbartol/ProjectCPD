@@ -3,376 +3,91 @@
 #include <string.h>
 #include <omp.h>
 
-#define BLACK_TURN 0
-#define RED_TURN 1
 #define FALSE 0
 #define TRUE 1
-#define isBlackTurn(t) ((t) == BLACK_TURN)
-#define isRedTurn(t) ((t) == RED_TURN)
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
-enum Move {
-	TOP = 0,
-	RIGHT = 1,
-	BOTTOM = 2,
-	LEFT = 3,
-	NONE = 4
-};
-
-enum Type {
+// Empty must always be 0
+typedef enum {
 	EMPTY = 0,
 	WOLF = 1,
 	SQUIRREL = 2,
 	TREE = 3,
 	ICE = 4,
 	SQUIRREL_ON_TREE = 5
-};
+} type_e;
 
-typedef struct world_t {
-	enum Type type;
+// None must always be the last one
+typedef enum {
+	TOP = 0,
+	RIGHT = 1,
+	BOTTOM = 2,
+	LEFT = 3,
+	NONE = 4
+} move_e;
+
+typedef struct {
+	type_e type;
 	int breeding_period;
 	int starvation_period;
 	int has_moved;
-} **World;
+} world_pos;
 
-typedef struct {
-	int row;
-	int column;
-} Position;
+typedef world_pos **world_t;
+typedef world_pos *world_pos_t;
 
-int NUM_ARGUMENTS = 6;
-int WOLF_BREEDING_LEVEL;
-int SQUIRREL_BREEDING_LEVEL;
-int WOLF_STARVING_LEVEL;
-int WORLD_SIZE;
-World old_world;
-World new_world;
+int numberOfPosition(int row, int col);
+type_e atot(char c);
+char ttoa(type_e type);
+void init(FILE *file, char **argv);
+void printWorld();
+int isRedGen(int row, int col);
+int isBlackGen(int row, int col);
+void playGen();
+void cleanWorld();
+int isWolfToSquirrel(world_pos_t from, world_pos_t to);
+move_e getMove(int row, int col);
+world_pos_t getDestination(int row, int col, move_e move, omp_lock_t **to_lock);
+void chooseBestSquirrel(world_pos_t from, world_pos_t to);
+void chooseBestWolf(world_pos_t from, world_pos_t to);
+void movePos(world_pos_t from, world_pos_t to);
+void updatePos(int row, int col);
+void copyPos(world_pos_t from, world_pos_t to);
+void copyWorld();
+int isBreeding(world_pos_t pos);
+int isStarving(world_pos_t pos);
+void breed(world_pos_t pos);
+void clean(world_pos_t pos);
 
-#ifdef PROJ_DEBUG
-/* DEBUG declaration */
-	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j);
-#endif
-char reverseConvertType(enum Type type);
+const int NUM_ARGUMENTS = 6;
+int WORLD_SIZE = 0;
+int WOLF_BREEDING_LEVEL = 0;
+int SQUIRREL_BREEDING_LEVEL = 0;
+int WOLF_STARVING_LEVEL = 0;
+int NUM_GENERATIONS = 0;
+world_t old_world = NULL;
+world_t new_world = NULL;
+omp_lock_t **lock_world = NULL;
 
-/* returns 1 if animal is breeding, 0 otherwise */
-int isBreeding(Position pos) {
-	if (old_world[pos.row][pos.column].type == WOLF) {
-		return old_world[pos.row][pos.column].breeding_period >= WOLF_BREEDING_LEVEL;
-	}
-	else if (old_world[pos.row][pos.column].type == SQUIRREL || old_world[pos.row][pos.column].type == SQUIRREL_ON_TREE) {
-		return old_world[pos.row][pos.column].breeding_period >= SQUIRREL_BREEDING_LEVEL;
-	}
-	return 0;
+int numberOfPosition(int row, int col) {
+	return row*WORLD_SIZE + col;
 }
 
-/* returns 1 if wolf is starving, 0 otherwise */
-int isStarving(Position pos) {
-	return old_world[pos.row][pos.column].type == WOLF ? 
-		old_world[pos.row][pos.column].starvation_period >= WOLF_STARVING_LEVEL :
-		0;
-}
-
-/* transforms a position into the corresponding number in the matrix */
-int numberOfPosition(Position pos) {
-	return pos.row * WORLD_SIZE + pos.column;
-}
-
-/* returns 1 if type can move to the given Position, 0 otherwise */
-int canMoveTo(Position from, Position to){
-	int fromCell = old_world[from.row][from.column].type;
-	int toCell = old_world[to.row][to.column].type;
-	
-	// can't move a tree or ice cell nor it can move to a ice cell
-	if ((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE || fromCell == WOLF) && (toCell != ICE)) {
-	// 	wolf's can't go to trees
-        if((fromCell == WOLF) && (toCell == EMPTY || toCell == SQUIRREL))
-            return 1;
-        else if((fromCell == SQUIRREL || fromCell == SQUIRREL_ON_TREE) && (toCell == EMPTY || toCell == TREE))
-            return 1;
-        else return 0;
-	}
-	return 0;
-}
-
-/* returns a valid move */
-Position getDestination(Position pos) {
-	Position possible[4];
-	int available[4] = {0,0,0,0};
-    
-	possible[TOP].row = pos.row - 1;
-	possible[TOP].column = pos.column;
-	possible[RIGHT].row = pos.row;
-	possible[RIGHT].column = pos.column + 1;
-	possible[BOTTOM].row = pos.row + 1;
-	possible[BOTTOM].column = pos.column;
-	possible[LEFT].row = pos.row;
-	possible[LEFT].column = pos.column - 1;
-    
-	int i;
-	int nAvailable = 0;
-    int nSquirrels = 0;
-
-	for (i = 0; i < 4; i++) {
-		if (possible[i].row >= 0 && possible[i].row < WORLD_SIZE &&
-            possible[i].column >= 0 && possible[i].column < WORLD_SIZE){
-			if (canMoveTo(pos, possible[i])) {
-                if(old_world[pos.row][pos.column].type == WOLF && old_world[possible[i].row][possible[i].column].type == SQUIRREL){
-                    available[i] = 2;
-                    nSquirrels++;
-                }
-				else {
-                    available[i] = 1;
-                    nAvailable++;
-                }
-            }
-		}
-	}
-    
-    if(nAvailable == 0 && nSquirrels == 0)
-        return pos;
-    
-    int n = 1;
-    if(nSquirrels != 0){
-        nAvailable = nSquirrels;
-        n = 2;
-    }
-    
-    int selected = numberOfPosition(pos) % nAvailable;
-	for (i = 0; i < 4; i++) {
-		if (available[i] == n) {
-			if (selected == 0){
-				return possible[i];
-			}
-			selected--;
-		}
-	}
-	return pos;
-}
-
-/* the cell becomes empty */
-void clean(Position pos) {
-    enum Type type = new_world[pos.row][pos.column].type; 
-    if (type == WOLF || type == SQUIRREL) {
-    	new_world[pos.row][pos.column].type = EMPTY;
-    }
-    else if (type == SQUIRREL_ON_TREE) {
-    	new_world[pos.row][pos.column].type = TREE;
-    }
-
-    new_world[pos.row][pos.column].starvation_period = 0;
-    new_world[pos.row][pos.column].breeding_period = 0;
-    new_world[pos.row][pos.column].has_moved = FALSE;
-}
-
-/* compare two positions and return 1 if they are the same position */
-int equals(Position pos1, Position pos2){
-	return (pos1.row == pos2.row) && (pos1.column == pos2.column);
-}
-
-void copyPos(Position old, Position new, enum Type newType) {
-	new_world[new.row][new.column].type = newType;
-	new_world[new.row][new.column].breeding_period = old_world[old.row][old.column].breeding_period;
-	new_world[new.row][new.column].starvation_period = old_world[old.row][old.column].starvation_period;
-	new_world[new.row][new.column].has_moved = TRUE;
-}
-
-// returns true if the animal has moved
-void chooseBestSquirrel(Position from, Position to) {
-	new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
-}
-
-// returns true if the animal wasn't eaten
-void chooseBestWolf(Position from, Position to) {
-	if (old_world[from.row][from.column].starvation_period == new_world[to.row][to.column].starvation_period) {
-		new_world[to.row][to.column].breeding_period = max(old_world[from.row][from.column].breeding_period, new_world[to.row][to.column].breeding_period);
-	} else if (old_world[from.row][from.column].starvation_period < new_world[to.row][to.column].starvation_period) {
-		new_world[to.row][to.column].breeding_period = old_world[from.row][from.column].breeding_period;
-		new_world[to.row][to.column].starvation_period = old_world[from.row][from.column].starvation_period;
-	}
-}
-
-void addChild(Position pos) {
-	new_world[pos.row][pos.column].breeding_period = 0;
-	new_world[pos.row][pos.column].starvation_period = 0;
-	new_world[pos.row][pos.column].has_moved = FALSE;
-}
-
-/* moves animal from the current position to its destination */
-
-int moveTo(Position from, Position to) { 
-	enum Type from_type = old_world[from.row][from.column].type;  
-    int had_child = FALSE;
-
-    if (isBreeding(from)) {
-    	addChild(from);
-    	had_child = TRUE;
-    	old_world[from.row][from.column].breeding_period = 0;
-    }
-
-    enum Type to_type = new_world[to.row][to.column].type;
-    switch (from_type) {
-   	case SQUIRREL:
-   	case SQUIRREL_ON_TREE:
-   		if (to_type == WOLF) {
-   			new_world[to.row][to.column].starvation_period = 0;
-    	} else if (to_type == SQUIRREL || to_type == SQUIRREL_ON_TREE) {
-			chooseBestSquirrel(from, to);
-			new_world[to.row][to.column].has_moved = TRUE;	
-		} else if (to_type == EMPTY || to_type == TREE) {
-			copyPos(from, to, (to_type == TREE) ? SQUIRREL_ON_TREE : SQUIRREL);
-		}
-		break;
-
-	case WOLF:
-		if (to_type == SQUIRREL) {
-    		copyPos(from, to, WOLF);
-    		new_world[to.row][to.column].starvation_period = 0;
-    	} else if (to_type == WOLF) {
-    	 	chooseBestWolf(from, to);
-    	 	new_world[to.row][to.column].has_moved = TRUE;
-    	} else if (to_type == EMPTY) { 
-    		copyPos(from, to, WOLF);
-    	}
-    	break;
-
-    default:
-    	fprintf(stderr, "Can't move %d!", from_type);
-    }
-
-	#ifdef PROJ_DEBUG
-	    printf("from: %c %d,%d  to: %c %d,%d\n", reverseConvertType(from_type),from.row,from.column, reverseConvertType(to_type),to.row,to.column);
-	#endif
-
-	return had_child;
-}
-
-void updateCell(Position pos) {
-    enum Type type = old_world[pos.row][pos.column].type;
-
-    if (type == ICE || type == TREE || type == EMPTY) {
-    	return;
-    }
-
-	Position to = getDestination(pos);
-	if (!equals(pos, to)) {
-		int no_child = !moveTo(pos, to);
-		if (no_child) {
-			clean(pos);
-		}
-	}
-}
-
-enum Type convertType(char type) {
-	switch (type) {
-	case 'w': return WOLF;
-	case 's': return SQUIRREL;
-	case 'i': return ICE;
-	case 't': return TREE;
-	case '$': return SQUIRREL_ON_TREE;
+type_e atot(char c) {
+	switch (c) {
+		case 'w': return WOLF;
+		case 's': return SQUIRREL;
+		case 'i': return ICE;
+		case 't': return TREE;
+		case '$': return SQUIRREL_ON_TREE;
 	}
 
-	fprintf(stderr, "Unknown type: %c\n", type);
+	fprintf(stderr, "Unknown type: %c\n", c);
 	exit(EXIT_FAILURE);
 }
 
-void createWorld(FILE *input) {
-	// read World size
-	fscanf(input, "%d", &WORLD_SIZE);
-
-	struct world_t *newWorld = malloc(sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
-	struct world_t *oldWorld = malloc(sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
-	new_world = malloc(sizeof(struct world_t*) * WORLD_SIZE);
-	old_world = malloc(sizeof(struct world_t*) * WORLD_SIZE);
-
-	int i;
-	#pragma omp parallel for private(i)
-	for (i = 0; i < WORLD_SIZE; i++) {
-		new_world[i] = newWorld + i*WORLD_SIZE;
-		old_world[i] = oldWorld + i*WORLD_SIZE;
-	}
-
-	// initialize World with zeros
-	memset(oldWorld, 0, sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
-	memset(newWorld, 0, sizeof(struct world_t) * WORLD_SIZE * WORLD_SIZE);
-
-	int row;
-	int column;
-	char type;
-	// initialize old world with map
-	while (fscanf(input, "%d %d %c", &row, &column, &type) == 3) {
-		old_world[row][column].type = convertType(type);
-		new_world[row][column].type = convertType(type);
-	}
-
-	#ifdef PROJ_DEBUG
-		printDebugWorld(old_world, 0, 0, 0, 0);
-	#endif
-}
-
-void play(int turn) {
-	int i, j;
-	Position pos;
-	#pragma omp parallel for private(i, j, pos)
-	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			pos.row = i;
-			pos.column = j;
-			if ((isRedTurn(turn) && (i % 2 == j % 2)) || (isBlackTurn(turn) && (i % 2 != j % 2))) {
-				#pragma omp critical (banana)
-				updateCell(pos);
-			}
-		}
-	}
-}
-
-/* prints the world with the correct output format */
-void printWorld(World w){
-	int i, j;
-	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			if (w[i][j].type != EMPTY){
-				fprintf(stdout, "%d %d %c\n", i,j, reverseConvertType(w[i][j].type));
-			}
-		}
-	}
-}
-
-void killAnimals() {
-	int i, j;
-	#pragma omp parallel for private(i, j)
-	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			Position pos = { .row = i, .column = j };
-			if (isStarving(pos)) {
-				clean(pos);
-				
-				#ifdef PROJ_DEBUG
-					fprintf(stdin, "Morreu de fome o %d %d\n", pos.row, pos.column);
-				#endif
-			}
-		}
-	}
-}
-
-void moving() {
-	int i, j;
-	#pragma omp parallel for private(i, j)
-	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			if (new_world[i][j].has_moved) {
-				new_world[i][j].has_moved = FALSE;
-				new_world[i][j].breeding_period++;
-			}
-
-			if (new_world[i][j].type == WOLF) {
-				new_world[i][j].starvation_period++;
-			}
-		}
-	}
-}
-
-char reverseConvertType(enum Type type) {
+char ttoa(type_e type) {
 	switch (type) {
 		case EMPTY:            return ' ';
 		case WOLF:             return 'w';
@@ -386,130 +101,476 @@ char reverseConvertType(enum Type type) {
 	exit(EXIT_FAILURE);
 }
 
-void copyWorld(World old, World new) {
+void init(FILE *file, char **argv) {
+	// read WORLD_SIZE
+	fscanf(file, "%d", &WORLD_SIZE);
+
+	world_pos_t newWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
+	world_pos_t oldWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
+	omp_lock_t *lockWorld = malloc(sizeof(omp_lock_t) * WORLD_SIZE * WORLD_SIZE);
+	new_world = malloc(sizeof(world_pos_t) * WORLD_SIZE);
+	old_world = malloc(sizeof(world_pos_t) * WORLD_SIZE);
+	lock_world = malloc(sizeof(omp_lock_t *) * WORLD_SIZE);
+
 	int i;
 	#pragma omp parallel for private(i)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		memcpy(old[i], new[i], sizeof(struct world_t) * WORLD_SIZE);
-	}
-}
-
-/*
-	arg[1] = filename
-	arg[2] = wolf_breeding_period
-	arg[3] = squirtle_breeding_period
-	arg[4] = wolf_starvation_period
-	arg[5] = # generations
-*/
-int main(int argc, char **argv) {
-	if (argc < NUM_ARGUMENTS) {
-		fprintf(stderr, "Not enough arguments...");
-		exit(EXIT_FAILURE);
+		new_world[i] = newWorld + i*WORLD_SIZE;
+		old_world[i] = oldWorld + i*WORLD_SIZE;
+		lock_world[i] = lockWorld + i*WORLD_SIZE;
 	}
 
-	// read file
-	FILE *input = fopen(argv[1], "r");
-	if (input == NULL) {
-		fprintf(stderr, "File %s not found...", argv[1]);
-		exit(EXIT_FAILURE);
+	// initialize both worlds with zeros
+	memset(oldWorld, 0, sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
+	memset(newWorld, 0, sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
+	for (i = 0; i < WORLD_SIZE*WORLD_SIZE; ++i) {
+		omp_init_lock(lockWorld + i);
 	}
+	
 
-	createWorld(input);
-	fclose(input);
+	// initialize both worlds with the map
+	int row;
+	int col;
+	char type;
+	while (fscanf(file, "%d %d %c", &row, &col, &type) == 3) {
+		old_world[row][col].type = atot(type);
+		new_world[row][col].type = atot(type);
+	}
 
 	WOLF_BREEDING_LEVEL = atoi(argv[2]);
 	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
 	WOLF_STARVING_LEVEL = atoi(argv[4]);
-	int number_generations = atoi(argv[5]);
+	NUM_GENERATIONS = atoi(argv[5]);
+}
 
-	#ifdef PROJ_DEBUG
-		fprintf(stdout, "initial variables:\n");
-		fprintf(stdout,"\t- WOLF_BREEDING_LEVEL[%d]\n", WOLF_BREEDING_LEVEL);
-		fprintf(stdout,"\t- SQUIRREL_BREEDING_LEVEL[%d]\n", SQUIRREL_BREEDING_LEVEL);
-		fprintf(stdout,"\t- WOLF_STARVING_LEVEL[%d]\n", WOLF_STARVING_LEVEL);
-		fprintf(stdout,"\t- number_generations[%d]\n\n", number_generations);
-	#endif
-
-	#ifdef PROJ_DEBUG
-		fprintf(stdout, "init\n");
-		printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
-		fprintf(stdout,"----------------------------------\n");
-	#endif
-
-	// starts measurement
-	double start = omp_get_wtime();
-
-	int gen;
-	for (gen = 0; gen < number_generations; gen++) {
-		killAnimals();
-		copyWorld(old_world, new_world);
-
-		play(RED_TURN);
-		copyWorld(old_world, new_world);
-
-		#ifdef PROJ_DEBUG
-			fprintf(stdout, "RED_TURN %d\n", gen +1);
-			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
-			fprintf(stdout, "\n\n");
-		#endif
-
-		play(BLACK_TURN);
-		copyWorld(old_world, new_world);
-
-		#ifdef PROJ_DEBUG
-			fprintf(stdout, "BLACK_TURN %d\n", gen +1);
-			printDebugWorld(new_world, 0, 0, WORLD_SIZE, WORLD_SIZE);
-			fprintf(stdout, "\n\n");
-		#endif
-
-		moving();
-		copyWorld(old_world, new_world);
-
-		
+void printWorld() {
+	int i, j;
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (new_world[i][j].type != EMPTY){
+				fprintf(stdout, "%d %d %c\n", i,j, ttoa(new_world[i][j].type));
+			}
+		}
 	}
+}
 
-	// ends measurement
-	double end = omp_get_wtime();
-	printf("Took %f\n", end - start);
+int isRedGen(int row, int col) {
+	return (row % 2) == (col % 2);
+}
 
-	#ifdef PROJ_DEBUG
-		fprintf(stdout,"\n\n----------------------------------\n");
-		fprintf(stdout, "END WORLD\n");
-		printDebugWorld(new_world, 0, 0, 4, 7);
-	#endif
-	printWorld(new_world);
-	return 0;
+int isBlackGen(int row, int col) {
+	return !isRedGen(row, col);
 }
 
 
-/*
- **********************************
- **                              **
- **        DEBUG FUNCTIONS       **
- **                              ** 
- **********************************
- */
+void clean(world_pos_t pos) {
+	switch (pos->type) {
+		case TREE:
+		case SQUIRREL_ON_TREE:
+			pos->type = TREE;
+			break;
 
+		case ICE:
+			pos->type = ICE;
+			break;
 
-#ifdef PROJ_DEBUG
-	void printDebugWorld(World w, int start_i, int start_j, int end_i, int end_j){
-		int i, j;
-		for (i = 0; i < WORLD_SIZE+1; ++i){
-			fprintf(stdout, "---");
-		}
-		printf("\n   ");
-		for (j = 0; j < WORLD_SIZE; ++j){
-			fprintf(stdout, "%2d|", j%100);
-		}
-		printf("\n");
+		default:
+			pos->type = EMPTY;
+	}
 
-		for (i = 0; i < WORLD_SIZE; i++) {
-			fprintf(stdout, "%2d:", i%100);
-			for (j = 0; j < WORLD_SIZE; j++) {
-				fprintf(stdout, "%c", reverseConvertType(w[i][j].type));
-			}
-			fprintf(stdout, "\n");
+	pos->breeding_period = 0;
+	pos->starvation_period = 0;
+	pos->has_moved = 0;
+}
+
+void cleanWorld() {
+	int i, j;
+	#pragma omp parallel for private(i,j)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			clean(&new_world[i][j]);
 		}
 	}
-#endif
+}
 
+int canMoveTo(world_pos_t from, world_pos_t to) {
+	// Can't move to ice
+	if (to->type == ICE) {
+		return FALSE;
+	}
+
+	switch (from->type) {
+		case SQUIRREL:
+		case SQUIRREL_ON_TREE:
+			return (to->type == EMPTY) || (to->type == TREE);
+
+		case WOLF:
+			return (to->type == EMPTY) || (to->type == SQUIRREL);
+
+		default:
+			fprintf(stderr, "Can't move this type: %d\n", from->type);
+			exit(EXIT_FAILURE);
+	}
+
+	return FALSE;
+}
+
+int isWolfToSquirrel(world_pos_t from, world_pos_t to) {
+	return (from->type == WOLF) && (to->type == SQUIRREL);
+}
+
+move_e getMove(int row, int col) {
+	const int NUM_OPTION = 4;
+	int available[NUM_OPTION];
+	memset( available, 0, NUM_OPTION*sizeof(int) );
+	int nAvailable = 0;
+    int nSquirrels = 0;
+
+    world_pos_t cur = &old_world[row][col];
+
+    // TOP
+    if ((row-1 >= 0) && canMoveTo(cur, &old_world[row-1][col])) {
+    	if (isWolfToSquirrel(cur, &old_world[row-1][col])) {
+			available[TOP] = 2;
+            nSquirrels++;
+		} else {
+            available[TOP] = 1;
+            nAvailable++;
+        }
+    }
+    
+    // RIGHT
+    if ((col+1 < WORLD_SIZE) && canMoveTo(cur, &old_world[row][col+1])) {
+    	if (isWolfToSquirrel(cur, &old_world[row][col+1])) {
+			available[RIGHT] = 2;
+            nSquirrels++;
+		} else {
+            available[RIGHT] = 1;
+            nAvailable++;
+        }
+    }
+
+    // BOTTOM
+    if ((row+1 < WORLD_SIZE) && canMoveTo(cur, &old_world[row+1][col])) {
+    	if (isWolfToSquirrel(cur, &old_world[row+1][col])) {
+			available[BOTTOM] = 2;
+            nSquirrels++;
+		} else {
+            available[BOTTOM] = 1;
+            nAvailable++;
+        }
+    } 
+
+    // LEFT
+    if ((col-1 >= 0) && canMoveTo(cur, &old_world[row][col-1])) {
+    	if (isWolfToSquirrel(cur, &old_world[row][col-1])) {
+			available[LEFT] = 2;
+            nSquirrels++;
+		} else {
+            available[LEFT] = 1;
+            nAvailable++;
+        }
+    }
+    
+    if (nAvailable == 0 && nSquirrels == 0)
+        return NONE;
+    
+    int n = 1;
+    if(nSquirrels != 0){
+        nAvailable = nSquirrels;
+        n = 2;
+    }
+    
+    int selected = numberOfPosition(row, col) % nAvailable;
+    int i;
+	for (i = 0; i < NUM_OPTION; i++) {
+		if (available[i] == n) {
+			if (selected == 0){
+				return i;
+			}
+			selected--;
+		}
+	}
+
+	return NONE;
+}
+
+world_pos_t getDestination(int row, int col, move_e move, omp_lock_t **to_lock) {
+	switch (move) {
+		case TOP:
+			*to_lock = &lock_world[row-1][col]; 
+			return &new_world[row-1][col];
+
+		case RIGHT:
+			*to_lock = &lock_world[row][col+1]; 
+			return &new_world[row][col+1];
+
+		case BOTTOM:
+			*to_lock = &lock_world[row+1][col];
+			return &new_world[row+1][col];
+
+		case LEFT:
+			*to_lock = &lock_world[row][col-1]; 
+			return &new_world[row][col-1];
+
+		case NONE:
+			*to_lock = &lock_world[row][col]; 
+			return &new_world[row][col];
+
+		default:
+			fprintf(stderr, "Unknown move: %d\n", move);
+			exit(EXIT_FAILURE);
+			return NULL;
+	}
+}
+
+void chooseBestSquirrel(world_pos_t from, world_pos_t to) {
+	to->breeding_period = max(from->breeding_period, to->breeding_period);
+}
+
+void chooseBestWolf(world_pos_t from, world_pos_t to) {
+	if (from->starvation_period == to->starvation_period) {
+		to->breeding_period = max(from->breeding_period, to->breeding_period);
+	} else if (from->starvation_period < to->starvation_period) {
+		to->breeding_period = from->breeding_period;
+		to->starvation_period = from->starvation_period;
+	}
+}
+
+
+/* 	Since animals avoid collisions by default,
+	if they encounter another animal, both have moved.
+
+	If an animal goes to an 'empty' position, it moves.
+
+	Since squirrels avoid wolfs, if a squirrel goes to
+	a position with a wolf, both have moved.
+
+	Since wolfs run after squirrels, he has moved.
+
+	Conclusion, in all cases, the animal in the end
+	always moves.
+*/
+void movePos(world_pos_t from, world_pos_t to) {
+	switch (from->type) {
+	   	case SQUIRREL:
+	   	case SQUIRREL_ON_TREE: {
+	   		switch (to->type) {
+	   		case WOLF:
+	   			to->starvation_period = 0;
+	   			break;
+
+	   		case SQUIRREL:
+	   		case SQUIRREL_ON_TREE:
+	   			chooseBestSquirrel(from, to);
+				break;
+
+			default:
+				copyPos(from, to);
+	   		}
+
+	   		break;
+	   	}
+
+		case WOLF: {
+			switch (to->type) {
+			case SQUIRREL:
+				copyPos(from, to);
+	    		to->starvation_period = 0;
+	    		break;
+
+			case WOLF:
+				chooseBestWolf(from, to);
+	    	 	break;
+
+	    	default:
+	    		copyPos(from, to);
+	    	}
+
+	    	break;
+	    }
+
+	    default:
+	    	fprintf(stderr, "Can't move %d!", from->type);
+	    	exit(EXIT_FAILURE);
+	}
+
+	to->has_moved = TRUE;
+}
+
+void updatePos(int row, int col) {
+	if ((old_world[row][col].type == EMPTY) || (old_world[row][col].type == TREE) || (old_world[row][col].type == ICE)) {
+		return;
+	}
+
+	move_e move = getMove(row, col);
+	world_pos_t from = &new_world[row][col];
+	omp_lock_t *to_lock = NULL;
+	world_pos_t to = getDestination(row, col, move, &to_lock);
+
+	if (from == to) {
+		return;
+	}
+
+	if (isBreeding(from)) {
+		from->breeding_period = 0;
+
+		omp_set_lock(to_lock);
+		movePos(from, to);
+		omp_unset_lock(to_lock);
+
+		breed(from); // This is the inverse of what we had
+	} else {
+		omp_set_lock(to_lock);
+		movePos(from, to);
+		omp_unset_lock(to_lock);
+		
+		clean(from);
+	}
+}
+
+void copyPos(world_pos_t from, world_pos_t to) {
+	switch (from->type) {
+		case SQUIRREL:
+		case SQUIRREL_ON_TREE: {
+			switch (to->type) {
+				case SQUIRREL_ON_TREE:
+				case TREE:
+					to->type = SQUIRREL_ON_TREE;
+					break;
+
+				default:
+					to->type = SQUIRREL;
+			}
+			break;
+		}
+
+		default:
+			to->type = from->type;
+	}
+
+	to->breeding_period = from->breeding_period;
+	to->starvation_period = from->starvation_period;
+	to->has_moved = from->has_moved;
+}
+
+// Copies the new world to the old world
+// It's independent of init
+void copyWorld() {
+	int i;
+	#pragma omp parallel for private(i)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		memcpy(old_world[i], new_world[i], sizeof(world_pos)*WORLD_SIZE);
+	}
+}
+
+int isBreeding(world_pos_t pos) {
+	switch (pos->type) {
+		case WOLF:
+			return pos->breeding_period == WOLF_BREEDING_LEVEL;
+
+		case SQUIRREL:
+		case SQUIRREL_ON_TREE:
+			return pos->breeding_period == SQUIRREL_BREEDING_LEVEL;
+
+		default:
+			return FALSE;
+	}
+}
+
+int isStarving(world_pos_t pos) {
+	switch (pos->type) {
+		case WOLF:
+			return pos->starvation_period == WOLF_STARVING_LEVEL;
+
+		default:
+			return FALSE;
+	}
+}
+
+// Same as clean but the type remains
+void breed(world_pos_t pos) {
+	pos->breeding_period = 0;
+	pos->starvation_period = 0;
+	pos->has_moved = 0;
+}
+
+// Can be improved
+void playGen() {
+	// Before generation, cleans starving animals
+	int i, j;
+	#pragma omp parallel for private(i,j)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (isStarving(&new_world[i][j])) {
+				clean(&new_world[i][j]);
+			}
+		}
+	}
+
+	// Must keep consistency between worlds
+	copyWorld();
+
+	// Red sub-generation
+	#pragma omp parallel for private(i,j)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (isRedGen(i, j)) {
+				updatePos(i, j);
+			}
+		}
+	}
+
+	// Must keep consistency between worlds
+	copyWorld();
+
+	// Black sub-generation
+	#pragma omp parallel for private(i,j)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (isBlackGen(i, j)) {
+				updatePos(i, j);
+			}
+		}
+	}
+
+	// After generation, increase breeding_period to the animals
+	// that moved
+	#pragma omp parallel for private(i,j)
+	for (i = 0; i < WORLD_SIZE; i++) {
+		for (j = 0; j < WORLD_SIZE; j++) {
+			if (new_world[i][j].has_moved) {
+				new_world[i][j].breeding_period++;
+				new_world[i][j].has_moved = FALSE;
+			}
+		}
+	}
+}
+
+int main(int argc, char **argv) {
+	if (argc < NUM_ARGUMENTS) {
+		fprintf(stderr, "Not enough arguments...\n");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE *input = fopen(argv[1], "r");
+	if (input == NULL) {
+		fprintf(stderr, "File %s not found...\n", argv[1]);
+		exit(EXIT_FAILURE);
+	}
+
+	init(input, argv);
+	fclose(input);
+
+	double start = omp_get_wtime();
+	int gen;
+	for (gen = 0; gen < NUM_GENERATIONS; gen++) {
+		playGen();
+	}
+
+	double end = omp_get_wtime();
+	printf("Took %f\n", end - start);
+
+	printWorld();
+	return 0;
+}
