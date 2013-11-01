@@ -29,9 +29,9 @@ typedef enum {
 
 typedef struct {
 	type_e type;
-	int breeding_period;
-	int starvation_period;
-	int has_moved;
+	unsigned char breeding_period;
+	unsigned char starvation_period;
+	unsigned char has_moved;
 } world_pos;
 
 typedef world_pos **world_t;

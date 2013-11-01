@@ -29,9 +29,9 @@ typedef enum {
 
 typedef struct {
 	type_e type;
-	int breeding_period;
-	int starvation_period;
-	int has_moved;
+	unsigned char breeding_period;
+	unsigned char starvation_period;
+	unsigned char has_moved;
 } world_pos;
 
 typedef world_pos **world_t;
@@ -498,7 +498,7 @@ void breed(world_pos_t pos) {
 void playGen() {
 	// Before generation, cleans starving animals
 	int i, j;
-	#pragma omp parallel for private(i,j)
+	#pragma omp parallel for schedule(dynamic) private(i,j)
 	for (i = 0; i < WORLD_SIZE; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
 			if (isStarving(&new_world[i][j])) {
@@ -513,11 +513,6 @@ void playGen() {
 	// Red sub-generation
 	#pragma omp parallel for private(i,j)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		// for (j = 0; j < WORLD_SIZE; j++) {
-		// 	if (isRedGen(i, j)) {
-		// 		updatePos(i, j);
-		// 	}
-		// }
 		for (j = (i % 2); j < WORLD_SIZE; j+=2) {
 			updatePos(i, j);
 		}
@@ -529,11 +524,6 @@ void playGen() {
 	// Black sub-generation
 	#pragma omp parallel for private(i,j)
 	for (i = 0; i < WORLD_SIZE; i++) {
-		// for (j = 0; j < WORLD_SIZE; j++) {
-		// 	if (isBlackGen(i, j)) {
-		// 		updatePos(i, j);
-		// 	}
-		// }
 		for (j = !(i % 2); j < WORLD_SIZE; j+=2) {
 			updatePos(i, j);
 		}
