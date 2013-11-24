@@ -61,6 +61,8 @@ int isBreeding(world_pos_t pos);
 int isStarving(world_pos_t pos);
 void breed(world_pos_t pos);
 void clean(world_pos_t pos);
+void sendOutsideBorders();
+void receiveInsideBorders();
 
 const int NUM_ARGUMENTS = 6;
 int WORLD_SIZE;
@@ -71,12 +73,15 @@ int NUM_GENERATIONS;
 
 int processor_id;
 int num_processors;
+
 world_t old_world = NULL; //delete
 world_t new_world = NULL;
 
 type_e *top_line = NULL;
+world_pos_t top_changed_line = NULL;
 world_t old_world_section = NULL;
 world_t new_world_section = NULL;
+world_pos_t bottom_changed_line = NULL;
 type_e *bottom_line = NULL;
 int section_lines = 0;
 
@@ -150,6 +155,9 @@ void master_init(FILE *file, char **argv) {
 	section_lines = ((WORLD_SIZE / num_processors) + ((WORLD_SIZE + (WORLD_SIZE%num_processors))/(WORLD_SIZE + i + 1)));
 	world_pos_t oldWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
 	world_pos_t newWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
+	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
+	bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
+	memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
 	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
@@ -188,6 +196,13 @@ void proc_init(FILE *file, char **argv) {
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
 	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
+	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
+	memset(top_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
+
+	if (processor_id != num_processors-1) {
+		bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
+		memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
+	}
 
 	for (i = 0; i < section_lines; i++) {
 		new_world_section[i] = newWorldSection + i*WORLD_SIZE;
@@ -502,8 +517,8 @@ void copyPos(world_pos_t from, world_pos_t to) {
 // It's independent of init
 void copyWorld() {
 	int i;
-	for (i = 0; i < WORLD_SIZE; i++) {
-		memcpy(old_world[i], new_world[i], sizeof(world_pos)*WORLD_SIZE);
+	for (i = 0; i < section_lines; i++) {
+		memcpy(old_world_section[i], new_world_section[i], sizeof(world_pos)*WORLD_SIZE);
 	}
 }
 
@@ -538,14 +553,44 @@ void breed(world_pos_t pos) {
 	pos->has_moved = 0;
 }
 
+void sendOutsideBorders() {
+	if(processor_id == MASTER){
+		MPI_Send(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD);
+	} else if(processor_id == num_processors-1){
+		MPI_Send(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD);
+	} else {
+		MPI_Send(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD);
+		MPI_Send(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD);
+	}
+}
+
+void receiveInsideBorders() {
+	int section_size = WORLD_SIZE*sizeof(world_pos);
+	world_pos_t top_received_line = malloc(section_size);
+	world_pos_t bottom_received_line = malloc(section_size);
+	if(processor_id == MASTER){
+		memset(top_received_line, 0, section_size);
+		MPI_Recv(bottom_received_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	} else if(processor_id == num_processors-1){
+		memset(bottom_received_line, 0, section_size);
+		MPI_Recv(top_received_line, section_size, MPI_BYTE, processor_id-1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	} else {
+		MPI_Recv(top_received_line, section_size, MPI_BYTE, processor_id-1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(bottom_received_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+	//merge(top_received_line, bottom_received_line);
+	free(top_received_line);
+	free(bottom_received_line);
+}
+
 // Can be improved
 void playGen() {
 	// Before generation, cleans starving animals
 	int i, j;
-	for (i = 0; i < WORLD_SIZE; i++) {
+	for (i = 0; i < section_lines; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
-			if (isStarving(&new_world[i][j])) {
-				clean(&new_world[i][j]);
+			if (isStarving(&new_world_section[i][j])) {
+				clean(&new_world_section[i][j]);
 			}
 		}
 	}
@@ -554,39 +599,43 @@ void playGen() {
 	copyWorld();
 
 	// Red sub-generation
-	for (i = 0; i < WORLD_SIZE; i++) {
+	for (i = 0; i < section_lines; i++) {
 		// for (j = 0; j < WORLD_SIZE; j++) {
 		// 	if (isRedGen(i, j)) {
 		// 		updatePos(i, j);
 		// 	}
 		// }
 		for (j = (i % 2); j < WORLD_SIZE; j+=2) {
-			updatePos(i, j);
+//			updatePos(i, j);
 		}
 	}
+	sendOutsideBorders();
+	receiveInsideBorders();
 
 	// Must keep consistency between worlds
 	copyWorld();
 
 	// Black sub-generation
-	for (i = 0; i < WORLD_SIZE; i++) {
+	for (i = 0; i < section_lines; i++) {
 		// for (j = 0; j < WORLD_SIZE; j++) {
 		// 	if (isBlackGen(i, j)) {
 		// 		updatePos(i, j);
 		// 	}
 		// }
 		for (j = !(i % 2); j < WORLD_SIZE; j+=2) {
-			updatePos(i, j);
+//			updatePos(i, j);
 		}
 	}
+	sendOutsideBorders();
+	receiveInsideBorders();
 
 	// After generation, increase breeding_period to the animals
 	// that moved
-	for (i = 0; i < WORLD_SIZE; i++) {
+	for (i = 0; i < section_lines; i++) {
 		for (j = 0; j < WORLD_SIZE; j++) {
-			if (new_world[i][j].has_moved) {
-				new_world[i][j].breeding_period++;
-				new_world[i][j].has_moved = FALSE;
+			if (new_world_section[i][j].has_moved) {
+				new_world_section[i][j].breeding_period++;
+				new_world_section[i][j].has_moved = FALSE;
 			}
 		}
 	}
@@ -620,29 +669,29 @@ int main(int argc, char **argv) {
 
 	double start = MPI_Wtime();
 	int gen;
-	/*
+
 	for (gen = 0; gen < NUM_GENERATIONS; gen++) {
 		playGen();
 	}
-	*/
+
 
 // *********  print section  **********
-//	int i, j;
-//	for (i = 0; i < section_lines; i++) {
-//		fprintf(stdout, "p[%d] -> %d|", processor_id, i%10);
-//	for (j = 0; j < WORLD_SIZE; j++) {
-//			fprintf(stdout, "%c ", ttoa(new_world_section[i][j].type));
-//		}
-//		fprintf(stdout, "\b|%d\n", i%10);
-//	}
-//	MPI_Barrier (MPI_COMM_WORLD);
+	int i, j;
+	for (i = 0; i < section_lines; i++) {
+		fprintf(stdout, "p[%d] -> %d|", processor_id, i%10);
+	for (j = 0; j < WORLD_SIZE; j++) {
+			fprintf(stdout, "%c ", ttoa(new_world_section[i][j].type));
+		}
+		fprintf(stdout, "\b|%d\n", i%10);
+	}
+	MPI_Barrier (MPI_COMM_WORLD);
 
 
 	double end = MPI_Wtime();
-	printf("Took %f\n", end - start); // Todos imprimem isto
+	printf("process %2d took %f\n", processor_id, end - start); // Todos imprimem isto
 
 //	printWorld();
-
+//	freeAll();
 	MPI_Finalize();
 	return 0;
 }
