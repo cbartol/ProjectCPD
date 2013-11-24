@@ -61,7 +61,9 @@ int isBreeding(world_pos_t pos);
 int isStarving(world_pos_t pos);
 void breed(world_pos_t pos);
 void clean(world_pos_t pos);
-void sendOutsideBorders();
+void sendInsideBorders(MPI_Request *);
+void receiveOutsideBorders();
+void sendOutsideBorders(MPI_Request *);
 void receiveInsideBorders();
 
 const int NUM_ARGUMENTS = 6;
@@ -100,6 +102,7 @@ type_e atot(char c) {
 	}
 
 	fprintf(stderr, "Unknown type: %c\n", c);
+	MPI_Finalize();
 	exit(EXIT_FAILURE);
 }
 
@@ -114,6 +117,7 @@ char ttoa(type_e type) {
 	}
 
 	fprintf(stderr, "Unknown type: %d\n", type);
+	MPI_Finalize();
 	exit(EXIT_FAILURE);
 }
 
@@ -157,6 +161,7 @@ void master_init(FILE *file, char **argv) {
 	world_pos_t newWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
 	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 	bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
+	bottom_line = malloc(sizeof(type_e) * WORLD_SIZE);
 	memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
@@ -196,10 +201,12 @@ void proc_init(FILE *file, char **argv) {
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
 	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
+	top_line = malloc(sizeof(type_e) * WORLD_SIZE);
 	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 	memset(top_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 
 	if (processor_id != num_processors-1) {
+		bottom_line = malloc(sizeof(type_e) * WORLD_SIZE);
 		bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 		memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 	}
@@ -279,6 +286,7 @@ int canMoveTo(world_pos_t from, world_pos_t to) {
 
 		default:
 			fprintf(stderr, "Can't move this type: %d\n", from->type);
+			MPI_Finalize();
 			exit(EXIT_FAILURE);
 	}
 
@@ -384,6 +392,7 @@ world_pos_t getDestination(int row, int col, move_e move) {
 
 		default:
 			fprintf(stderr, "Unknown move: %d\n", move);
+			MPI_Finalize();
 			exit(EXIT_FAILURE);
 
 			// doesn't do anything
@@ -459,6 +468,7 @@ void movePos(world_pos_t from, world_pos_t to) {
 
 	    default:
 	    	fprintf(stderr, "Can't move %d!", from->type);
+	    	MPI_Finalize();
 	    	exit(EXIT_FAILURE);
 	}
 
@@ -553,17 +563,60 @@ void breed(world_pos_t pos) {
 	pos->has_moved = 0;
 }
 
-void sendOutsideBorders() {
+// sends the border lines that are inside of the process's world's section.
+// 		Note: only send cell types to the other process
+void sendInsideBorders(MPI_Request *request) {
+	int section_size = WORLD_SIZE*sizeof(type_e);
+	type_e *top_send_line = malloc(section_size);
+	type_e *bottom_send_line = malloc(section_size);
+	int j;
+	for (j = 0; j < WORLD_SIZE; ++j){
+		top_send_line[j] = new_world_section[0][j].type;
+		bottom_send_line[j] = new_world_section[section_lines-1][j].type;
+	}
+
 	if(processor_id == MASTER){
-		MPI_Send(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD);
+		MPI_Isend(bottom_send_line, section_size, MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD, &(request[1]));
 	} else if(processor_id == num_processors-1){
-		MPI_Send(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD);
+		MPI_Isend(top_send_line, section_size, MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD, &(request[0]));
 	} else {
-		MPI_Send(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD);
-		MPI_Send(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD);
+		MPI_Isend(top_send_line, section_size, MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD, &(request[0]));
+		MPI_Isend(bottom_send_line, section_size, MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD, &(request[1]));
+	}
+	free(top_send_line);
+	free(bottom_send_line);
+}
+
+// receives the border lines that are outside of the process's world's section.
+// 		Note: only receive cell types from the other process
+void receiveOutsideBorders() {
+	int section_size = WORLD_SIZE*sizeof(type_e);
+	if(processor_id == MASTER){
+		MPI_Recv(bottom_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	} else if(processor_id == num_processors-1){
+		MPI_Recv(top_line, section_size, MPI_BYTE, processor_id-1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	} else {
+		MPI_Recv(top_line, section_size, MPI_BYTE, processor_id-1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(bottom_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 }
 
+// sends the border lines that affect other processes' world's section. 
+// 		Note: send a complete line (with all atributes) to the other process
+void sendOutsideBorders(MPI_Request *request) {
+	if(processor_id == MASTER){
+		MPI_Isend(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD, &(request[1]));
+	} else if(processor_id == num_processors-1){
+		MPI_Isend(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD, &(request[0]));
+	} else {
+		MPI_Isend(top_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id-1, 0, MPI_COMM_WORLD, &(request[0]));
+		MPI_Isend(bottom_changed_line, WORLD_SIZE*sizeof(world_pos), MPI_BYTE, processor_id+1, 1, MPI_COMM_WORLD, &(request[1]));
+	}
+}
+
+// receives the border lines that affect the process's world's section.
+// these lines will be merged and conflicts are resolved 
+// 		Note: receives a complete line (with all atributes) from the other process
 void receiveInsideBorders() {
 	int section_size = WORLD_SIZE*sizeof(world_pos);
 	world_pos_t top_received_line = malloc(section_size);
@@ -585,6 +638,7 @@ void receiveInsideBorders() {
 
 // Can be improved
 void playGen() {
+	MPI_Request request[2];
 	// Before generation, cleans starving animals
 	int i, j;
 	for (i = 0; i < section_lines; i++) {
@@ -597,6 +651,8 @@ void playGen() {
 
 	// Must keep consistency between worlds
 	copyWorld();
+	sendInsideBorders(request);
+	receiveOutsideBorders();
 
 	// Red sub-generation
 	for (i = 0; i < section_lines; i++) {
@@ -609,11 +665,14 @@ void playGen() {
 //			updatePos(i, j);
 		}
 	}
-	sendOutsideBorders();
-	receiveInsideBorders();
 
 	// Must keep consistency between worlds
 	copyWorld();
+	sendOutsideBorders(request);
+	receiveInsideBorders();
+
+	sendInsideBorders(request);
+	receiveOutsideBorders();
 
 	// Black sub-generation
 	for (i = 0; i < section_lines; i++) {
@@ -626,7 +685,7 @@ void playGen() {
 //			updatePos(i, j);
 		}
 	}
-	sendOutsideBorders();
+	sendOutsideBorders(request);
 	receiveInsideBorders();
 
 	// After generation, increase breeding_period to the animals
@@ -648,6 +707,7 @@ int main(int argc, char **argv) {
 	}
 
 	MPI_Init (&argc, &argv);
+	MPI_Barrier (MPI_COMM_WORLD);
 
 	MPI_Comm_rank (MPI_COMM_WORLD, &processor_id);
 	MPI_Comm_size (MPI_COMM_WORLD, &num_processors);
@@ -655,6 +715,7 @@ int main(int argc, char **argv) {
 	FILE *input = fopen(argv[1], "r");
 	if (input == NULL) {
 		fprintf(stderr, "File %s not found...\n", argv[1]);
+		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
 
@@ -676,21 +737,24 @@ int main(int argc, char **argv) {
 
 
 // *********  print section  **********
-	int i, j;
-	for (i = 0; i < section_lines; i++) {
-		fprintf(stdout, "p[%d] -> %d|", processor_id, i%10);
-	for (j = 0; j < WORLD_SIZE; j++) {
-			fprintf(stdout, "%c ", ttoa(new_world_section[i][j].type));
-		}
-		fprintf(stdout, "\b|%d\n", i%10);
-	}
+//	int i, j;
+//	for (i = 0; i < section_lines; i++) {
+//		fprintf(stdout, "p[%d] -> %d|", processor_id, i%10);
+//	for (j = 0; j < WORLD_SIZE; j++) {
+//			fprintf(stdout, "%c ", ttoa(new_world_section[i][j].type));
+//		}
+//		fprintf(stdout, "\b|%d\n", i%10);
+//	}
 	MPI_Barrier (MPI_COMM_WORLD);
 
 
 	double end = MPI_Wtime();
-	printf("process %2d took %f\n", processor_id, end - start); // Todos imprimem isto
+	printf("process %2d took %f\n", processor_id, end - start); // estao todos a imprimir isto
 
-//	printWorld();
+	MPI_Barrier (MPI_COMM_WORLD);
+	if (processor_id == MASTER)	{
+		printWorld();
+	}
 //	freeAll();
 	MPI_Finalize();
 	return 0;
