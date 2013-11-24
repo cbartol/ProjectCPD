@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <mpi.h>
 
+#define MASTER 0
 #define FALSE 0
 #define TRUE 1
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -42,6 +43,7 @@ int numberOfPosition(int row, int col);
 type_e atot(char c);
 char ttoa(type_e type);
 void master_init(FILE *file, char **argv);
+void proc_init(FILE *file, char **argv);
 void printWorld();
 int isRedGen(int row, int col);
 int isBlackGen(int row, int col);
@@ -69,13 +71,14 @@ int NUM_GENERATIONS;
 
 int processor_id;
 int num_processors;
-//world_t old_world = NULL;
+world_t old_world = NULL; //delete
 world_t new_world = NULL;
 
 type_e *top_line = NULL;
 world_t old_world_section = NULL;
 world_t new_world_section = NULL;
 type_e *bottom_line = NULL;
+int section_lines = 0;
 
 
 int numberOfPosition(int row, int col) {
@@ -142,14 +145,58 @@ void master_init(FILE *file, char **argv) {
 	WOLF_STARVING_LEVEL = atoi(argv[4]);
 	NUM_GENERATIONS = atoi(argv[5]);
 
-	int i;
+	// initialize master's world section
+	i = MASTER;
+	section_lines = ((WORLD_SIZE / num_processors) + ((WORLD_SIZE + (WORLD_SIZE%num_processors))/(WORLD_SIZE + i + 1)));
+	world_pos_t oldWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
+	world_pos_t newWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
+	
+	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
+	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
+	memcpy(oldWorldSection, newWorld, sizeof(world_pos)*WORLD_SIZE*section_lines);
+	memcpy(newWorldSection, newWorld, sizeof(world_pos)*WORLD_SIZE*section_lines);
 
-	void *buff = newWorld;
+	for (i = 0; i < section_lines; i++) {
+		new_world_section[i] = newWorldSection + i*WORLD_SIZE;
+		old_world_section[i] = oldWorldSection + i*WORLD_SIZE;
+	}
+
+	// send to other processors their world section
+	void *buff = newWorld + WORLD_SIZE*section_lines;
+
 	for (i = 1; i < num_processors; ++i) {
-		size_t section_size = ((WORLD_SIZE / num_processors) + ((WORLD_SIZE + (WORLD_SIZE%num_processors))/(WORLD_SIZE + i + 1)))*WORLD_SIZE*sizeof(world_pos_t);
-		MPI_Send(buff, section_size, MPI_BYTE, i, i, MPI_COMM_WORLD);
+		MPI_Request request;
+		int section_size = ((WORLD_SIZE / num_processors) + ((WORLD_SIZE + (WORLD_SIZE%num_processors))/(WORLD_SIZE + i + 1)))*WORLD_SIZE*sizeof(world_pos);
+		MPI_Isend(buff, section_size, MPI_BYTE, i, i, MPI_COMM_WORLD, &request);
 		buff += section_size;
 	}
+}
+
+
+
+void proc_init(FILE *file, char **argv) {
+	fscanf(file, "%d", &WORLD_SIZE);
+	WOLF_BREEDING_LEVEL = atoi(argv[2]);
+	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
+	WOLF_STARVING_LEVEL = atoi(argv[4]);
+	NUM_GENERATIONS = atoi(argv[5]);
+
+	int i = processor_id;
+	section_lines = ((WORLD_SIZE / num_processors) + ((WORLD_SIZE + (WORLD_SIZE%num_processors))/(WORLD_SIZE + i + 1)));
+	world_pos_t oldWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
+	world_pos_t newWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
+	
+	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
+	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
+
+	for (i = 0; i < section_lines; i++) {
+		new_world_section[i] = newWorldSection + i*WORLD_SIZE;
+		old_world_section[i] = oldWorldSection + i*WORLD_SIZE;
+	}
+	int section_size = sizeof(world_pos)*WORLD_SIZE*section_lines;
+
+	MPI_Recv(newWorldSection, section_size, MPI_BYTE, MASTER, processor_id, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	memcpy(oldWorldSection, newWorldSection, sizeof(world_pos)*WORLD_SIZE*section_lines);
 }
 
 void printWorld() {
@@ -556,30 +603,45 @@ int main(int argc, char **argv) {
 	MPI_Comm_rank (MPI_COMM_WORLD, &processor_id);
 	MPI_Comm_size (MPI_COMM_WORLD, &num_processors);
 
-	if (processor_id == 0){
-		FILE *input = fopen(argv[1], "r");
-		if (input == NULL) {
-			fprintf(stderr, "File %s not found...\n", argv[1]);
-			exit(EXIT_FAILURE);
-		}
-		master_init(input, argv);
-	} else {
-		proc_init(); // TODO!!!
+	FILE *input = fopen(argv[1], "r");
+	if (input == NULL) {
+		fprintf(stderr, "File %s not found...\n", argv[1]);
+		exit(EXIT_FAILURE);
 	}
 
-
+	if (processor_id == MASTER){
+		master_init(input, argv);
+	} else {
+		proc_init(input, argv);
+	}
 	fclose(input);
 
-	double start = omp_get_wtime();
+	MPI_Barrier (MPI_COMM_WORLD);
+
+	double start = MPI_Wtime();
 	int gen;
+	/*
 	for (gen = 0; gen < NUM_GENERATIONS; gen++) {
 		playGen();
 	}
+	*/
 
-	double end = omp_get_wtime();
-	printf("Took %f\n", end - start);
+// *********  print section  **********
+//	int i, j;
+//	for (i = 0; i < section_lines; i++) {
+//		fprintf(stdout, "p[%d] -> %d|", processor_id, i%10);
+//	for (j = 0; j < WORLD_SIZE; j++) {
+//			fprintf(stdout, "%c ", ttoa(new_world_section[i][j].type));
+//		}
+//		fprintf(stdout, "\b|%d\n", i%10);
+//	}
+//	MPI_Barrier (MPI_COMM_WORLD);
 
-	printWorld();
+
+	double end = MPI_Wtime();
+	printf("Took %f\n", end - start); // Todos imprimem isto
+
+//	printWorld();
 
 	MPI_Finalize();
 	return 0;

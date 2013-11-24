@@ -18,7 +18,7 @@ omp:
 	gcc -Wall -O3 -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp
 
 mpi:
-	gcc -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c
+	mpicc -g -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c
 
 clean:
 	rm -rf $(BIN) 2> /dev/null
