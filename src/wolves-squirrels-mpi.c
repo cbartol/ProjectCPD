@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <omp.h>
 #include <mpi.h>
 
 #define MASTER 0
@@ -11,14 +10,12 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 // Empty must always be 0
-typedef enum {
-	EMPTY = 0,
-	WOLF = 1,
-	SQUIRREL = 2,
-	TREE = 3,
-	ICE = 4,
-	SQUIRREL_ON_TREE = 5
-} type_e;
+#define EMPTY 0
+#define WOLF 1
+#define SQUIRREL 2
+#define TREE 3
+#define ICE 4
+#define SQUIRREL_ON_TREE 5
 
 // None must always be the last one
 typedef enum {
@@ -30,7 +27,7 @@ typedef enum {
 } move_e;
 
 typedef struct {
-	type_e type;
+	unsigned char type;
 	unsigned char breeding_period;
 	unsigned char starvation_period;
 	unsigned char has_moved;
@@ -40,8 +37,8 @@ typedef world_pos **world_t;
 typedef world_pos *world_pos_t;
 
 int numberOfPosition(int row, int col);
-type_e atot(char c);
-char ttoa(type_e type);
+unsigned char atot(char c);
+char ttoa(unsigned char type);
 void master_init(FILE *file, char **argv);
 void proc_init(FILE *file, char **argv);
 void printWorld();
@@ -79,12 +76,12 @@ int num_processors;
 world_t old_world = NULL; //delete
 world_t new_world = NULL;
 
-type_e *top_line = NULL;
+unsigned char *top_line = NULL;
 world_pos_t top_changed_line = NULL;
 world_t old_world_section = NULL;
 world_t new_world_section = NULL;
 world_pos_t bottom_changed_line = NULL;
-type_e *bottom_line = NULL;
+unsigned char *bottom_line = NULL;
 int section_lines = 0;
 
 
@@ -92,7 +89,7 @@ int numberOfPosition(int row, int col) {
 	return row*WORLD_SIZE + col;
 }
 
-type_e atot(char c) {
+unsigned char atot(char c) {
 	switch (c) {
 		case 'w': return WOLF;
 		case 's': return SQUIRREL;
@@ -106,7 +103,7 @@ type_e atot(char c) {
 	exit(EXIT_FAILURE);
 }
 
-char ttoa(type_e type) {
+char ttoa(unsigned char type) {
 	switch (type) {
 		case EMPTY:            return ' ';
 		case WOLF:             return 'w';
@@ -123,7 +120,10 @@ char ttoa(type_e type) {
 
 void master_init(FILE *file, char **argv) {
 	// read WORLD_SIZE
-	fscanf(file, "%d", &WORLD_SIZE);
+	if (fscanf(file, "%d", &WORLD_SIZE) == 0) {
+		MPI_Finalize();
+		exit(EXIT_FAILURE);
+	}
 
 	world_pos_t newWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
 //	world_pos_t oldWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
@@ -161,7 +161,7 @@ void master_init(FILE *file, char **argv) {
 	world_pos_t newWorldSection = malloc(sizeof(world_pos) * WORLD_SIZE * section_lines);
 	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 	bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
-	bottom_line = malloc(sizeof(type_e) * WORLD_SIZE);
+	bottom_line = malloc(sizeof(unsigned char) * WORLD_SIZE);
 	memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
@@ -188,7 +188,11 @@ void master_init(FILE *file, char **argv) {
 
 
 void proc_init(FILE *file, char **argv) {
-	fscanf(file, "%d", &WORLD_SIZE);
+	if (fscanf(file, "%d", &WORLD_SIZE) == 0) {
+		MPI_Finalize();
+		exit(EXIT_FAILURE);
+	}
+
 	WOLF_BREEDING_LEVEL = atoi(argv[2]);
 	SQUIRREL_BREEDING_LEVEL = atoi(argv[3]);
 	WOLF_STARVING_LEVEL = atoi(argv[4]);
@@ -201,12 +205,12 @@ void proc_init(FILE *file, char **argv) {
 	
 	old_world_section = malloc(sizeof(world_pos_t) * section_lines);
 	new_world_section = malloc(sizeof(world_pos_t) * section_lines);
-	top_line = malloc(sizeof(type_e) * WORLD_SIZE);
+	top_line = malloc(sizeof(unsigned char) * WORLD_SIZE);
 	top_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 	memset(top_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 
 	if (processor_id != num_processors-1) {
-		bottom_line = malloc(sizeof(type_e) * WORLD_SIZE);
+		bottom_line = malloc(sizeof(unsigned char) * WORLD_SIZE);
 		bottom_changed_line = malloc(sizeof(world_pos) * WORLD_SIZE);
 		memset(bottom_changed_line, 0, sizeof(world_pos) * WORLD_SIZE);
 	}
@@ -566,9 +570,9 @@ void breed(world_pos_t pos) {
 // sends the border lines that are inside of the process's world's section.
 // 		Note: only send cell types to the other process
 void sendInsideBorders(MPI_Request *request) {
-	int section_size = WORLD_SIZE*sizeof(type_e);
-	type_e *top_send_line = malloc(section_size);
-	type_e *bottom_send_line = malloc(section_size);
+	int section_size = WORLD_SIZE*sizeof(unsigned char);
+	unsigned char *top_send_line = malloc(section_size);
+	unsigned char *bottom_send_line = malloc(section_size);
 	int j;
 	for (j = 0; j < WORLD_SIZE; ++j){
 		top_send_line[j] = new_world_section[0][j].type;
@@ -590,7 +594,7 @@ void sendInsideBorders(MPI_Request *request) {
 // receives the border lines that are outside of the process's world's section.
 // 		Note: only receive cell types from the other process
 void receiveOutsideBorders() {
-	int section_size = WORLD_SIZE*sizeof(type_e);
+	int section_size = WORLD_SIZE*sizeof(unsigned char);
 	if(processor_id == MASTER){
 		MPI_Recv(bottom_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	} else if(processor_id == num_processors-1){

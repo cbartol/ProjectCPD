@@ -7,7 +7,7 @@ all: clean create serial omp mpi
 debug: clean create
 	gcc -Wall -o $(BIN)/wolves-squirrels-serial $(SRC)/wolves-squirrels-serial.c -fopenmp -DPROJ_DEBUG=1 -g3
 	gcc -Wall -o $(BIN)/wolves-squirrels-omp $(SRC)/wolves-squirrels-omp.c -fopenmp -DPROJ_DEBUG=1 -g3
-	mpicc -Wall -g -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c -DPROJ_DEBUG=1
+	mpicc -Wall -o $(BIN)/wolves-squirrels-mpi $(SRC)/wolves-squirrels-mpi.c -DPROJ_DEBUG=1 -g3
 
 create:
 	mkdir -p $(BIN)

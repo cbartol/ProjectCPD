@@ -9,14 +9,12 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
 // Empty must always be 0
-typedef enum {
-	EMPTY = 0,
-	WOLF = 1,
-	SQUIRREL = 2,
-	TREE = 3,
-	ICE = 4,
-	SQUIRREL_ON_TREE = 5
-} type_e;
+#define EMPTY 0
+#define WOLF 1
+#define SQUIRREL 2
+#define TREE 3
+#define ICE 4
+#define SQUIRREL_ON_TREE 5
 
 // None must always be the last one
 typedef enum {
@@ -28,7 +26,7 @@ typedef enum {
 } move_e;
 
 typedef struct {
-	type_e type;
+	unsigned char type;
 	unsigned char breeding_period;
 	unsigned char starvation_period;
 	unsigned char has_moved;
@@ -38,8 +36,8 @@ typedef world_pos **world_t;
 typedef world_pos *world_pos_t;
 
 int numberOfPosition(int row, int col);
-type_e atot(char c);
-char ttoa(type_e type);
+unsigned char atot(char c);
+char ttoa(unsigned char type);
 void init(FILE *file, char **argv);
 void printWorld();
 int isRedGen(int row, int col);
@@ -72,7 +70,7 @@ int numberOfPosition(int row, int col) {
 	return row*WORLD_SIZE + col;
 }
 
-type_e atot(char c) {
+unsigned char atot(char c) {
 	switch (c) {
 		case 'w': return WOLF;
 		case 's': return SQUIRREL;
@@ -85,7 +83,7 @@ type_e atot(char c) {
 	exit(EXIT_FAILURE);
 }
 
-char ttoa(type_e type) {
+char ttoa(unsigned char type) {
 	switch (type) {
 		case EMPTY:            return ' ';
 		case WOLF:             return 'w';
@@ -101,7 +99,9 @@ char ttoa(type_e type) {
 
 void init(FILE *file, char **argv) {
 	// read WORLD_SIZE
-	fscanf(file, "%d", &WORLD_SIZE);
+	if (fscanf(file, "%d", &WORLD_SIZE) == 0) {
+		exit(EXIT_FAILURE);
+	}
 
 	world_pos_t newWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
 	world_pos_t oldWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
