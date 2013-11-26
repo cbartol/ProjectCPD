@@ -26,8 +26,10 @@ typedef enum {
 	NONE = 4
 } move_e;
 
+#define type_e unsigned char
+
 typedef struct {
-	unsigned char type;
+	type_e type;
 	unsigned char breeding_period;
 	unsigned char starvation_period;
 	unsigned char has_moved;
@@ -35,33 +37,6 @@ typedef struct {
 
 typedef world_pos **world_t;
 typedef world_pos *world_pos_t;
-
-int numberOfPosition(int row, int col);
-unsigned char atot(char c);
-char ttoa(unsigned char type);
-void master_init(FILE *file, char **argv);
-void proc_init(FILE *file, char **argv);
-void printWorld();
-int isRedGen(int row, int col);
-int isBlackGen(int row, int col);
-void playGen();
-void cleanWorld();
-int isWolfToSquirrel(world_pos_t from, world_pos_t to);
-move_e getMove(int row, int col);
-void chooseBestSquirrel(world_pos_t from, world_pos_t to);
-void chooseBestWolf(world_pos_t from, world_pos_t to);
-void movePos(world_pos_t from, world_pos_t to);
-void updatePos(int row, int col);
-void copyPos(world_pos_t from, world_pos_t to);
-void copyWorld();
-int isBreeding(world_pos_t pos);
-int isStarving(world_pos_t pos);
-void breed(world_pos_t pos);
-void clean(world_pos_t pos);
-void sendInsideBorders(MPI_Request *);
-void receiveOutsideBorders();
-void sendOutsideBorders(MPI_Request *);
-void receiveInsideBorders();
 
 const int NUM_ARGUMENTS = 6;
 int WORLD_SIZE;
@@ -73,7 +48,6 @@ int NUM_GENERATIONS;
 int processor_id;
 int num_processors;
 
-world_t old_world = NULL; //delete
 world_t new_world = NULL;
 
 unsigned char *top_line = NULL;
@@ -128,7 +102,6 @@ void master_init(FILE *file, char **argv) {
 	world_pos_t newWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
 //	world_pos_t oldWorld = malloc(sizeof(world_pos) * WORLD_SIZE * WORLD_SIZE);
 	new_world = malloc(sizeof(world_pos_t) * WORLD_SIZE);
-//	old_world = malloc(sizeof(world_pos_t) * WORLD_SIZE);
 
 	int i;
 	for (i = 0; i < WORLD_SIZE; i++) {
@@ -175,6 +148,7 @@ void master_init(FILE *file, char **argv) {
 	}
 
 	// send to other processors their world section
+	// jumps to the second section
 	void *buff = newWorld + WORLD_SIZE*section_lines;
 
 	for (i = 1; i < num_processors; ++i) {
@@ -265,31 +239,22 @@ void clean(world_pos_t pos) {
 	pos->has_moved = 0;
 }
 
-void cleanWorld() {
-	int i, j;
-	for (i = 0; i < WORLD_SIZE; i++) {
-		for (j = 0; j < WORLD_SIZE; j++) {
-			clean(&new_world[i][j]);
-		}
-	}
-}
-
-int canMoveTo(world_pos_t from, world_pos_t to) {
+int canMoveTo(type_e from, type_e to) {
 	// Can't move to ice
-	if (to->type == ICE) {
+	if (to == ICE) {
 		return FALSE;
 	}
 
-	switch (from->type) {
+	switch (from) {
 		case SQUIRREL:
 		case SQUIRREL_ON_TREE:
-			return (to->type == EMPTY) || (to->type == TREE);
+			return (to == EMPTY) || (to == TREE);
 
 		case WOLF:
-			return (to->type == EMPTY) || (to->type == SQUIRREL);
+			return (to == EMPTY) || (to == SQUIRREL);
 
 		default:
-			fprintf(stderr, "Can't move this type: %d\n", from->type);
+			fprintf(stderr, "Can't move this type: %d\n", from);
 			MPI_Finalize();
 			exit(EXIT_FAILURE);
 	}
@@ -297,8 +262,8 @@ int canMoveTo(world_pos_t from, world_pos_t to) {
 	return FALSE;
 }
 
-int isWolfToSquirrel(world_pos_t from, world_pos_t to) {
-	return (from->type == WOLF) && (to->type == SQUIRREL);
+int isWolfToSquirrel(type_e from, type_e to) {
+	return (from == WOLF) && (to == SQUIRREL);
 }
 
 move_e getMove(int row, int col) {
@@ -308,11 +273,17 @@ move_e getMove(int row, int col) {
 	int nAvailable = 0;
     int nSquirrels = 0;
 
-    world_pos_t cur = &old_world[row][col];
+    type_e cur = old_world_section[row][col].type;
+    type_e top_element = EMPTY;
+    if ((processor_id == MASTER && (row-1 >= 0)) || ((processor_id != MASTER) && (row != 0))) {
+    	top_element = old_world_section[row-1][col].type;
+    } else if ((processor_id != MASTER) && (row == 0)) {
+    	top_element = top_line[col]; 
+    }
 
     // TOP
-    if ((row-1 >= 0) && canMoveTo(cur, &old_world[row-1][col])) {
-    	if (isWolfToSquirrel(cur, &old_world[row-1][col])) {
+    if ((top_element != EMPTY) && canMoveTo(cur, top_element))   {
+    	if (isWolfToSquirrel(cur, top_element)) {
 			available[TOP] = 2;
             nSquirrels++;
 		} else {
@@ -322,8 +293,8 @@ move_e getMove(int row, int col) {
     }
     
     // RIGHT
-    if ((col+1 < WORLD_SIZE) && canMoveTo(cur, &old_world[row][col+1])) {
-    	if (isWolfToSquirrel(cur, &old_world[row][col+1])) {
+    if ((col+1 < WORLD_SIZE) && canMoveTo(cur, old_world_section[row][col+1].type)) {
+    	if (isWolfToSquirrel(cur, old_world_section[row][col+1].type)) {
 			available[RIGHT] = 2;
             nSquirrels++;
 		} else {
@@ -332,9 +303,16 @@ move_e getMove(int row, int col) {
         }
     }
 
+    type_e bottom_element = EMPTY;
+    if ((processor_id == num_processors-1 && (row+1 < WORLD_SIZE)) || ((processor_id != num_processors-1) && (row != section_lines-1))) {
+    	bottom_element = old_world_section[row+1][col].type;
+    } else if ((processor_id != num_processors-1)) {
+    	bottom_element = bottom_line[col];
+    }
+
     // BOTTOM
-    if ((row+1 < WORLD_SIZE) && canMoveTo(cur, &old_world[row+1][col])) {
-    	if (isWolfToSquirrel(cur, &old_world[row+1][col])) {
+    if ((bottom_element != EMPTY) && canMoveTo(cur, bottom_element)) {
+    	if (isWolfToSquirrel(cur, bottom_element)) {
 			available[BOTTOM] = 2;
             nSquirrels++;
 		} else {
@@ -344,8 +322,8 @@ move_e getMove(int row, int col) {
     } 
 
     // LEFT
-    if ((col-1 >= 0) && canMoveTo(cur, &old_world[row][col-1])) {
-    	if (isWolfToSquirrel(cur, &old_world[row][col-1])) {
+    if ((col-1 >= 0) && canMoveTo(cur, old_world_section[row][col-1].type)) {
+    	if (isWolfToSquirrel(cur, old_world_section[row][col-1].type)) {
 			available[LEFT] = 2;
             nSquirrels++;
 		} else {
@@ -380,19 +358,19 @@ move_e getMove(int row, int col) {
 world_pos_t getDestination(int row, int col, move_e move) {
 	switch (move) {
 		case TOP:
-			return &new_world[row-1][col];
+			return &new_world_section[row-1][col];
 
 		case RIGHT:
-			return &new_world[row][col+1];
+			return &new_world_section[row][col+1];
 
 		case BOTTOM:
-			return &new_world[row+1][col];
+			return &new_world_section[row+1][col];
 
 		case LEFT:
-			return &new_world[row][col-1];
+			return &new_world_section[row][col-1];
 
 		case NONE:
-			return &new_world[row][col];
+			return &new_world_section[row][col];
 
 		default:
 			fprintf(stderr, "Unknown move: %d\n", move);
@@ -400,7 +378,7 @@ world_pos_t getDestination(int row, int col, move_e move) {
 			exit(EXIT_FAILURE);
 
 			// doesn't do anything
-			return &new_world[row][col];
+			return &new_world_section[row][col];
 	}
 }
 
@@ -417,6 +395,30 @@ void chooseBestWolf(world_pos_t from, world_pos_t to) {
 	}
 }
 
+void copyPos(world_pos_t from, world_pos_t to) {
+	switch (from->type) {
+		case SQUIRREL:
+		case SQUIRREL_ON_TREE: {
+			switch (to->type) {
+				case SQUIRREL_ON_TREE:
+				case TREE:
+					to->type = SQUIRREL_ON_TREE;
+					break;
+
+				default:
+					to->type = SQUIRREL;
+			}
+			break;
+		}
+
+		default:
+			to->type = from->type;
+	}
+
+	to->breeding_period = from->breeding_period;
+	to->starvation_period = from->starvation_period;
+	to->has_moved = from->has_moved;
+}
 
 /* 	Since animals avoid collisions by default,
 	if they encounter another animal, both have moved.
@@ -479,52 +481,43 @@ void movePos(world_pos_t from, world_pos_t to) {
 	to->has_moved = TRUE;
 }
 
+// Same as clean but the type remains
+void breed(world_pos_t pos) {
+	pos->breeding_period = 0;
+	pos->starvation_period = 0;
+	pos->has_moved = 0;
+}
+
 void updatePos(int row, int col) {
-	if ((old_world[row][col].type == EMPTY) || (old_world[row][col].type == TREE) || (old_world[row][col].type == ICE)) {
+	if ((old_world_section[row][col].type == EMPTY) || (old_world_section[row][col].type == TREE) || (old_world_section[row][col].type == ICE)) {
 		return;
 	}
 
 	move_e move = getMove(row, col);
-	world_pos_t from = &new_world[row][col];
-	world_pos_t to = getDestination(row, col, move);
 
-	if (from == to) {
-		return;
+	if (move == TOP && row == 0) {
+		top_changed_line[col] = old_world_section[row][col];
+	} 
+	else if (move == BOTTOM && row == section_lines-1) { 
+		bottom_changed_line[col] = old_world_section[row][col];
 	}
+	else {
+		world_pos_t from = &new_world_section[row][col];
+		world_pos_t to = getDestination(row, col, move);
 
-	if (isBreeding(from)) {
-		from->breeding_period = 0;
-		movePos(from, to);
-		breed(from); // This is the inverse of what we had
-	} else {
-		movePos(from, to);
-		clean(from);
-	}
-}
-
-void copyPos(world_pos_t from, world_pos_t to) {
-	switch (from->type) {
-		case SQUIRREL:
-		case SQUIRREL_ON_TREE: {
-			switch (to->type) {
-				case SQUIRREL_ON_TREE:
-				case TREE:
-					to->type = SQUIRREL_ON_TREE;
-					break;
-
-				default:
-					to->type = SQUIRREL;
-			}
-			break;
+		if (from == to) {
+			return;
 		}
 
-		default:
-			to->type = from->type;
+		if (isBreeding(from)) {
+			from->breeding_period = 0;
+			movePos(from, to);
+			breed(from); // This is the inverse of what we had
+		} else {
+			movePos(from, to);
+			clean(from);
+		}
 	}
-
-	to->breeding_period = from->breeding_period;
-	to->starvation_period = from->starvation_period;
-	to->has_moved = from->has_moved;
 }
 
 // Copies the new world to the old world
@@ -560,11 +553,12 @@ int isStarving(world_pos_t pos) {
 	}
 }
 
-// Same as clean but the type remains
-void breed(world_pos_t pos) {
-	pos->breeding_period = 0;
-	pos->starvation_period = 0;
-	pos->has_moved = 0;
+void merge(world_pos_t topLine , world_pos_t bottomLine) {
+	int i;
+	for (i = 0; i < WORLD_SIZE; i++) {
+		movePos(&topLine[i], &new_world_section[0][i]);
+		movePos(&bottomLine[i], &new_world_section[section_lines-1][i]);
+	}
 }
 
 // sends the border lines that are inside of the process's world's section.
@@ -635,7 +629,9 @@ void receiveInsideBorders() {
 		MPI_Recv(top_received_line, section_size, MPI_BYTE, processor_id-1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		MPI_Recv(bottom_received_line, section_size, MPI_BYTE, processor_id+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
-	//merge(top_received_line, bottom_received_line);
+	
+	merge(top_received_line, bottom_received_line);
+	
 	free(top_received_line);
 	free(bottom_received_line);
 }
